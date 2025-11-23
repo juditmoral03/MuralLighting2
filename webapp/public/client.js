@@ -386,10 +386,10 @@ fetch('/app/images')
 
         // Create GUI menus
         leftImageMenu = gui.add(params, 'leftImage', images).name('Left Image').onChange((value) => {
-            exrLoader.load('.app/textures/' + value, loadLeftImage, undefined, loadingError);
+            exrLoader.load('./textures/' + value, loadLeftImage, undefined, loadingError);
         });
         rightImageMenu = gui.add(params, 'rightImage', images).name('Right Image').onChange((value) => {
-            exrLoader.load('.app/textures/' + value, loadRightImage, undefined, loadingError);
+            exrLoader.load('./textures/' + value, loadRightImage, undefined, loadingError);
         });
 
         leftImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
