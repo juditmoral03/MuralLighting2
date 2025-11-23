@@ -45,12 +45,16 @@ containerR.classList.add('image-frame', 'hidden');
 let selectedWindow = '';
 
 // Only one frame visible at a time and save selection
+// Only one frame visible at a time and save selection
 containerL.addEventListener('click', () => {
     containerL.classList.remove('hidden');
     containerR.classList.add('hidden');
     selectedWindow = 'left';
     localStorage.setItem('selectedWindow', selectedWindow); 
     console.log("Seleccionat: esquerra");
+    
+    // --- NUEVO: AVISAR A PYTHON ---
+    notifyPython('left'); 
 });
 
 containerR.addEventListener('click', () => {
@@ -59,13 +63,15 @@ containerR.addEventListener('click', () => {
     selectedWindow = 'right';
     localStorage.setItem('selectedWindow', selectedWindow); 
     console.log("Seleccionat: dreta");
+
+    // --- NUEVO: AVISAR A PYTHON ---
+    notifyPython('right');
 });
 
 
 function applyStoredSelection() {
     const stored = localStorage.getItem('selectedWindow');
     if (!stored) {
-        
         return;
     }
 
@@ -73,12 +79,15 @@ function applyStoredSelection() {
         containerL.classList.remove('hidden');
         containerR.classList.add('hidden');
         selectedWindow = 'left';
+        // Avisamos a Python al cargar la página
+        notifyPython('left'); 
         
     } else if (stored === 'right') {
         containerR.classList.remove('hidden');
         containerL.classList.add('hidden');
         selectedWindow = 'right';
-        
+        // Avisamos a Python al cargar la página
+        notifyPython('right');
     }
 }
 
@@ -595,6 +604,32 @@ function onMouseUp() {
 // update max delta value (using GUI control)
 function updateDiffParams() {
     difWin.updateDiffParams(params.maxDiff, params.imgOverlay);
+}
+
+// Función para enviar la selección a Python
+async function notifyPython(selection) {
+    // Detectamos si estamos en producción (Render/Nginx) o local
+    // Si estamos en Nginx (Render), la ruta raíz / apunta a Python.
+    // Si estamos en local (Node puerto 3006), necesitamos apuntar al 8080 explícitamente.
+    
+    let url = '/set_selected_window'; // Funciona en Render/Nginx
+    
+    // Si estás probando en local sin Nginx, descomenta la siguiente línea:
+    // url = 'http://localhost:8080/set_selected_window'; 
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ selected: selection })
+        });
+        const data = await response.json();
+        console.log("Python actualizado:", data);
+    } catch (error) {
+        console.error("Error contactando con Python:", error);
+    }
 }
 
 window.addEventListener('DOMContentLoaded', applyStoredSelection);
