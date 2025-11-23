@@ -249,24 +249,29 @@ function getQueryParams() {
     };
 }
 
-function loadSelectedImagesFromURL() {
+const TEXTURE_BASE_PATH = '/app/textures/'; 
+
+function loadImagesFromUrlParams() {
     const { img1, img2 } = getQueryParams();
 
+    // Si Python nos envía imágenes, las cargamos INMEDIATAMENTE
     if (img1 && img2) {
+        console.log("📥 Cargando desde URL (Python):", img1, img2);
+        
         params.leftImage = img1;
         params.rightImage = img2;
 
-        // Update GUI menus if they already exist
+        // Intentamos actualizar los menús de la GUI si ya existen
         if (leftImageMenu && rightImageMenu) {
             leftImageMenu.setValue(img1);   
             rightImageMenu.setValue(img2);  
         } else {
-            // If the menus don't exist yet, we just load the images
-            showSelectedImages();
+            // Si los menús no existen aún, cargamos las imágenes directamente usando la ruta absoluta
+            exrLoader.load(TEXTURE_BASE_PATH + img1, loadLeftImage, undefined, loadingError);
+            exrLoader.load(TEXTURE_BASE_PATH + img2, loadRightImage, undefined, loadingError);
         }
     }
 }
-
 
 // Call on page load
 //window.addEventListener('DOMContentLoaded', loadSelectedImagesFromURL);
@@ -379,38 +384,53 @@ imgDiffFolder.add(params, 'imgOverlay', 0.0, 1.0).name('Image Overlay').onChange
 let leftImageMenu, rightImageMenu;
 let images = [];
 
+// Cargar lista de imágenes para el menú (Secundario)
 fetch('/app/images')
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) throw new Error("No se pudo cargar la lista de imágenes");
+        return response.json();
+    })
     .then(files => {
         images = files;
 
-        // Create GUI menus
+        // Creamos los menús del GUI
         leftImageMenu = gui.add(params, 'leftImage', images).name('Left Image').onChange((value) => {
-            exrLoader.load('./textures/' + value, loadLeftImage, undefined, loadingError);
+            console.log("Cambio manual Left:", value);
+            exrLoader.load(TEXTURE_BASE_PATH + value, loadLeftImage, undefined, loadingError);
         });
+        
         rightImageMenu = gui.add(params, 'rightImage', images).name('Right Image').onChange((value) => {
-            exrLoader.load('./textures/' + value, loadRightImage, undefined, loadingError);
+            console.log("Cambio manual Right:", value);
+            exrLoader.load(TEXTURE_BASE_PATH + value, loadRightImage, undefined, loadingError);
         });
 
+        // Ocultar inputs extraños del GUI
         leftImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
         rightImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
 
-        // Load initial images
+        // Una vez creado el menú, sincronizamos por si la URL ya traía imágenes
+        // (Esto evita que el menú sobrescriba la selección de Python)
         const { img1, img2 } = getQueryParams();
         if (img1 && img2) {
-            params.leftImage = img1;
-            params.rightImage = img2;
+            leftImageMenu.setValue(img1);
+            rightImageMenu.setValue(img2);
         } else {
+            // Si no hay nada en la URL, cargamos los primeros por defecto
             params.leftImage = images[0];
             params.rightImage = images[1];
+            leftImageMenu.setValue(images[0]);
+            rightImageMenu.setValue(images[1]);
         }
-
-        // Update GUI menus (this also triggers loading of images)
-        leftImageMenu.setValue(params.leftImage);
-        rightImageMenu.setValue(params.rightImage);
     })
-    .catch(error => console.error('Error fetching images: ', error));
+    .catch(error => {
+        console.warn('⚠️ Error cargando menú de imágenes (fetch failed). Cargando imágenes de URL igualmente.', error);
+        // Aunque falle el fetch del menú, CARGAMOS LAS IMÁGENES DE PYTHON
+        loadImagesFromUrlParams();
+    });
 
+// EJECUCIÓN INMEDIATA:
+// No esperamos al fetch. Si hay parámetros en la URL, cargamos la escena ya.
+loadImagesFromUrlParams();
 
 
 ///// Rendering + Tone mapping
