@@ -6,66 +6,78 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 
-// Servir arxius estàtics
+// Serveix arxius estàtics
 app.use(express.static(__dirname + '/public'));
 app.use('/build/', express.static(path.join(__dirname, 'node_modules/three/build')));
 app.use('/jsm/', express.static(path.join(__dirname, 'node_modules/three/examples/jsm')));
 
-// Instal·lar NiceGUI dins d'un entorn virtual local (venv)
+// Instal·la NiceGUI en un venv local
 function ensureNiceguiInstalled() {
   try {
     execSync('python3 -m venv venv', { stdio: 'inherit' });
-    execSync('./venv/bin/pip install nicegui', { stdio: 'inherit' });
+    execSync('./venv/bin/pip install --no-cache-dir nicegui', { stdio: 'inherit' });
   } catch (error) {
-    console.error('Error creant l\'entorn virtual o instal·lant NiceGUI:', error);
+    console.error('Error creant venv o instal·lant NiceGUI:', error);
   }
 }
 
-// Iniciar el procés Python (NiceGUI) al port 8080
+// Inicia el procés Python amb autorestart
+let pythonProcess = null;
 function startPythonApp() {
   const mainPath = path.join(__dirname, '../menu/main.py');
-  const pythonProcess = spawn('./venv/bin/python', [mainPath], { stdio: 'inherit' });
-  console.log('Procés NiceGUI iniciat (Python)');
+
+  function launch() {
+    pythonProcess = spawn('./venv/bin/python', [mainPath], { stdio: 'inherit' });
+
+    pythonProcess.on('exit', (code) => {
+      console.log(`Procés Python tancat (codi ${code}), reiniciant en 3s...`);
+      setTimeout(launch, 3000);
+    });
+  }
+
+  launch();
 }
 
-// Llistar arxius .EXR
+// Endpoint per obtenir fitxers EXR
 function getEXRFiles(basePath, dir = '', arrayOfFiles = []) {
   const dirPath = basePath + dir;
   const files = fs.readdirSync(dirPath);
-
-  files.forEach(function (file) {
+  for (const file of files) {
     const fullPath = path.join(dirPath, file);
     const relPath = dir + file;
     if (fs.statSync(fullPath).isDirectory())
       arrayOfFiles = getEXRFiles(basePath, relPath + '/', arrayOfFiles);
     else if (path.extname(file) === '.exr')
       arrayOfFiles.push(relPath);
-  });
-
+  }
   return arrayOfFiles;
 }
 
-// Endpoint JSON amb llista d'imatges
 app.get('/images', (req, res) => {
   const files = getEXRFiles(__dirname + '/public/textures/');
   res.json(files);
 });
 
-// Proxy per a NiceGUI
+// Configura el proxy a NiceGUI (port intern 8081)
 app.use(
   '/gui',
   createProxyMiddleware({
-    target: 'http://127.0.0.1:8081', // 👈 canviat de 8080 → 8081
+    target: 'http://127.0.0.1:8081',
     changeOrigin: true,
+    ws: true, // permet WebSockets (necessari per NiceGUI)
+    logLevel: 'debug',
   })
 );
 
-
-// Iniciar servidor Express (Render exposarà aquest port)
-const PORT = process.env.PORT || 3000;
+// Inicia el servidor Express
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`Servidor Node/Express iniciat a port ${PORT}`);
+  console.log(`Servidor Node/Express iniciat al port ${PORT}`);
   ensureNiceguiInstalled();
-  startPythonApp();
-});
 
+  // Espera uns segons per evitar col·lisions
+  setTimeout(() => {
+    console.log('Iniciant NiceGUI...');
+    startPythonApp();
+  }, 5000);
+});
