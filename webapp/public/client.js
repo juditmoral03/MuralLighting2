@@ -379,7 +379,7 @@ imgDiffFolder.add(params, 'imgOverlay', 0.0, 1.0).name('Image Overlay').onChange
 let leftImageMenu, rightImageMenu;
 let images = [];
 
-fetch('/images')
+fetch('/app/images')
     .then(response => response.json())
     .then(files => {
         images = files;
