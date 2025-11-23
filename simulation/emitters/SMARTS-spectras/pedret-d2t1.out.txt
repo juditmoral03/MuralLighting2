@@ -1,0 +1,122 @@
+
+******************   SMARTS, version 2.9.5   *******************
+
+ Simple Model of the Atmospheric Radiative Transfer of Sunshine
+     Chris A. Gueymard, Solar Consulting Services
+                    December 2005
+
+    This model is documented in FSEC Report PF-270-95
+ and in a Solar Energy paper, vol. 71, No.5, 325-346 (2001)
+
+ NOTE: These references describe v. 2.8 or earlier!!!
+ See the User's Manual for details on the considerable 
+ changes that followed...
+
+****************************************************************
+
+   Reference for this run: Pedret_d2t1_01_04_10_00_test                                    
+
+----------------------------------------------------------------
+
+* ATMOSPHERE : MLS         AEROSOL TYPE: S&F_RURAL                                                       
+
+* INPUTS:
+     Pressure (mb) =  757.394   Ground Altitude (km) =   1.8833
+     Height above ground (km) =   0.5900
+     Relative Humidity (%) = 50.514   Precipitable Water (cm) =  0.7846
+     Ozone (atm-cm) = 0.3250 or 325.0 Dobson Units
+   AEROSOLS:  Optical Depth at 500 nm = 0.1480      Optical depth at 550 nm = 0.1297
+       Angstrom's Beta = 0.0565       Schuepp's B = 0.0643
+     Meteorological Range (km) =   63.4   Visibility (km) =   48.5
+     Alpha1 = 0.9530  Alpha2 = 1.3889   Mean Angstrom's Alpha = 1.1709
+     Season = SPRING/SUMMER           
+
+* TEMPERATURES:
+     Instantaneous at site's altitude = 282.3 K
+     Daily average (reference) at site's altitude = 282.3 K
+     Stratospheric Ozone and NO2 (effective) = 230.9 K
+
+** WARNING #13 *********
+\\ Ground reflectance data for CONIFER_TREES           
+\\ extend only from 0.3020 to 4.0000 µm,
+\\ whereas the wavelength limits for this run are 0.2800 and 1.0500 µm.
+\\ Consequently, reflectance is fixed at 0.039 below 0.3020 µm and at 0.013 above 4.0000 µm.
+
+
+
+The following spectral variables will be output to file: pedret-d2t1.ext.txt     
+
+ * Extraterrestrial_spectrm
+ * Direct_normal_irradiance
+ * Difuse_horizn_irradiance
+ * Global_horizn_irradiance
+
+
+      Spectral ZONAL albedo data: CONIFER_TREES           
+      with a reflection process: NON_LAMBERTIAN          
+
+
+
+====================================================================================================
+====================================================================================================
+
+* SOLAR POSITION (deg.):
+    Zenith Angle (apparent) = 64.129  Azimuth (from North) =  108.24
+
+      RELATIVE OPTICAL MASSES:
+  - Rayleigh =  2.283
+  - Water Vapor =  2.290
+  - Ozone =  2.271
+  - NO2 =  2.275
+  - Aerosols =  2.289
+
+  Results below are for this specific day:
+ Year = 2024   Month =  4  Day =  1   Hour (LST) =  9.000   Day of Year =  92
+   In Universal Time:
+   Day (UT) =  1   Hour (UT) =  8.000
+   Julian Day =  2460401.750  Declination =   4.778 deg.  Radius vector = 0.99935   Equation of Time (min) =  -3.748
+   Local Apparent Time (or Solar Time):   8.063
+
+
+
+ CO2 Mixing Ratio (ppmv):  370.0
+
+
+
+ Total column abundances (atm-cm) for all gases except H2O, and for normal/standard conditions:
+
+    BrO       CH2O        CH4      ClNO3         CO        CO2       HNO2       HNO3        NH3
+
+0.2500E-05 0.3000E-03 0.9089E+00 0.1200E-03 0.5783E-01 0.2198E+03 0.1000E-03 0.3704E-03 0.7069E-04
+
+
+     NO        NO2        NO3         N2        N2O         O2         O3         O4        SO2
+
+0.2606E-03 0.2136E-03 0.5000E-04 0.2133E+06 0.1693E+00 0.1242E+06 0.3250E+00 0.1242E+06 0.5378E-04
+
+
+
+
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
+
+** SPECTRUM:
+   Total (0-100 µm) Extraterrestrial Irradiance used here = 1368.77 W/m2
+  (i.e., 1.0013 times the selected solar constant, 1367.00 W/m2, due to the actual Sun-Earth distance.)
+   Source for selected solar spectrum: Gueymard_2003                                                   
+
+ To account for the chosen Solar Constant value, the selected solar spectrum has been uniformly multiplied
+ by this scaling coefficient = 1.0007
+
+
+Wavelength Range =  280.0 to 1050.0 nm;  Number of Wavelengths =   891
+
+*** BROADBAND IRRADIANCES (W/m2):
+
+* DIRECT BEAM AT NORMAL INCIDENCE:
+  Extraterrestrial =  983.47   Terrestrial =  572.58   Atmospheric Transmittance = 0.5822
+
+* FOR THE HORIZONTAL PLANE:
+  Direct Beam =  249.84   Diffuse =  89.72   Global =  339.56   Clearness index, KT = 0.2481
+  Diffuse irradiance origination details:
+   Sky diffuse =  84.79   Back-scattered diffuse =   4.93
+

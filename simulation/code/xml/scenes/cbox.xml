@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.6.0">
+    <!-- Integrator -->
+    <integrator type="path">
+        <integer name="max_depth" value="4"/>
+    </integrator>
+
+    <!-- Camera -->
+    <sensor type="perspective">
+        <float name="fov" value="39.597755"/>
+        <string name="fov_axis" value="x"/>
+        <float name="near_clip" value="0.1"/>
+        <float name="far_clip" value="100.0"/>
+        <transform name="to_world">
+            <translate x="1.400590" y="-0.601761" z="-15.005084"/>
+            <scale x="1.0" y="1.0" z="1.0"/>
+            <rotate x="0" y="0" z="1" angle="-171.86098766942905"/>
+            <rotate x="0" y="1" z="0" angle="60.259371273194176"/>
+            <rotate x="1" y="0" z="0" angle="179.99944493344438"/>
+        </transform>
+        <sampler type="independent">
+            <integer name="sample_count" value="4"/>
+        </sampler>
+        <film type="hdrfilm">
+            <integer name="width" value="1920"/>
+            <integer name="height" value="1080"/>
+        </film>
+    </sensor>
+
+    <!-- Shapes -->
+    <shape type="obj">
+        <string name="filename" value="model/XII/1_Pedret_XII.obj"/>
+        <bsdf type="twosided">
+            <bsdf type="normalmap">
+                <texture type="bitmap" name="normalmap">
+                    <boolean name="raw" value="true"/>
+                    <string name="filename" value="textures/pedret_XII/Pedret_X_normals_1.png"/>
+                </texture>
+                <bsdf type="diffuse">
+                    <texture type="bitmap" name="reflectance">
+                        <string name="filename" value="textures/pedret_XII/Pedret_X_color_1.png"/>
+                    </texture>
+                </bsdf>
+            </bsdf>
+        </bsdf>
+    </shape>
+
+    <shape type="obj">
+        <string name="filename" value="model/XII/2_Pedret_XII.obj"/>
+        <bsdf type="twosided">
+            <bsdf type="normalmap">
+                <texture type="bitmap" name="normalmap">
+                    <boolean name="raw" value="true"/>
+                    <string name="filename" value="textures/pedret_XII/Pedret_X_normals_2.png"/>
+                </texture>
+                <bsdf type="diffuse">
+                    <texture type="bitmap" name="reflectance">
+                        <string name="filename" value="textures/pedret_XII/Pedret_X_color_2.png"/>
+                    </texture>
+                </bsdf>
+            </bsdf>
+        </bsdf>
+    </shape>
+
+    <!-- Add other shapes similarly... -->
+
+    <!-- Emitters -->
+    <emitter type="directional">
+        <vector name="direction" x="-0.2024" y="-0.4050" z="-0.8916"/>
+        <spectrum name="irradiance" filename="spdfiles/global_pedret.spd"/>
+    </emitter>
+
+    <emitter type="constant">
+        <spectrum name="radiance" filename="spdfiles/d65_spectrum.spd"/>
+    </emitter>
+
+    <emitter type="point">
+        <point name="position" x="6.5284" y="1.1359" z="-16.852"/>
+        <spectrum name="intensity" filename="spdvid/Medida_Continua_Parafina_diam3_2.spd"/>
+    </emitter>
+
+    <!-- Add other emitters similarly... -->
+</scene>
+

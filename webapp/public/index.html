@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            overflow: hidden;
+            margin: 0px;
+            display: flex;
+            background-color: #000;
+        }
+
+        .threejs-window {
+            width: 50%;
+            height: 100vh;
+        }
+
+        .dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0);
+            justify-content: center;
+            align-items: center;
+            pointer-events: all;
+            z-index: 1000;
+        }
+
+        .dialog-content {
+            background-color: #fff;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+            width: 40%;
+            height: 90%;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .dialog-header {
+            cursor: grab;
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .close-button {
+            position: absolute;
+            top: -2px;
+            right: 5px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .image-frame {
+            border: 3px solid white;
+        
+
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 0 15px white;
+        }
+
+        .image-frame.hidden {
+            border-color: transparent;
+            box-shadow: none;
+        }
+    </style>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.2/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./build/three.module.js"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="window1" class="threejs-window"></div>
+    <div id="window2" class="threejs-window"></div>
+
+    <div id="differenceDialog" class="dialog">
+        <div id="differenceView" class="dialog-content">
+            <div id="drag-handle" class="dialog-header"></div>
+            <span id="closeDialog" class="close-button">&times;</span>
+            <div id="winDiff" style="width:100%; height:95%" class="threejs-window"></div>
+        </div>
+    </div>
+
+
+
+    <script type="module" src="client.js"></script>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const containerL = document.getElementById('window1');
+            const containerR = document.getElementById('window2');
+
+            let selectedWindow = null;
+
+            containerL.addEventListener('click', () => {
+                containerL.classList.remove('hidden');
+                containerR.classList.add('hidden');
+                selectedWindow = 'left';
+                console.log("Seleccionat: esquerra");
+                fetch('http://127.0.0.1:8080/set_selected_window', {  
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected: 'left' })
+                })
+            });
+
+            containerR.addEventListener('click', () => {
+                containerR.classList.remove('hidden');
+                containerL.classList.add('hidden');
+                selectedWindow = 'right';
+                console.log("Seleccionat: dreta");
+                fetch('http://127.0.0.1:8080/set_selected_window', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected: 'right' })
+                })
+
+            });
+        });
+    </script>
+
+
+
+</body>
+
+</html>
