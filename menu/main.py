@@ -1381,5 +1381,5 @@ body, html {
     .style('height: calc(100vh - 50px); position: relative; z-index: 0; margin-left: -16px;')
 
 
-port = int(os.environ.get("PORT", 8081))  # Usa el port de l'entorn Render si existeix, si no 8081
-ui.run(host="0.0.0.0", port=port)
+port = int(os.environ.get("PORT", 10000))
+ui.run(port=port)
