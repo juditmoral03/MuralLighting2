@@ -55,10 +55,11 @@ app.get('/images', (req, res) => {
 app.use(
   '/gui',
   createProxyMiddleware({
-    target: 'http://127.0.0.1:8080', // NiceGUI s'executarà aquí
+    target: 'http://127.0.0.1:8081', // 👈 canviat de 8080 → 8081
     changeOrigin: true,
   })
 );
+
 
 // Iniciar servidor Express (Render exposarà aquest port)
 const PORT = process.env.PORT || 3000;
@@ -67,3 +68,4 @@ app.listen(PORT, () => {
   ensureNiceguiInstalled();
   startPythonApp();
 });
+
