@@ -13,13 +13,17 @@
     "@types/dat.gui": "^0.7.13",
     "dat.gui": "^0.7.9",
     "express": "^4.21.0",
+    "http-proxy-middleware": "^3.0.5",
     "three": "^0.168.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
   },
   "nodemonConfig": {
-  "watch": ["app.js", "../menu/main.py"],
-  "ext": "js,py"
-}
+    "watch": [
+      "app.js",
+      "../menu/main.py"
+    ],
+    "ext": "js,py"
+  }
 }

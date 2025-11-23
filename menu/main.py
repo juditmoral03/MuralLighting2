@@ -301,6 +301,13 @@ D3T2 = "Time: 11:53 am"
 D3T3 = "Time: 13:53 pm"
 
 @ui.page('/')
+
+def index():
+    ui.label('Hola! Aquesta és la interfície NiceGUI dins Render (via proxy).')
+
+if __name__ in {'__main__', '__mp_main__'}:
+    ui.run(host='0.0.0.0', port=8080)
+    
 def main():
     global iframe_container
     selected_cards.clear()
