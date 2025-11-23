@@ -639,11 +639,11 @@ body, html {
                 ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
                     if visible_D2T1_natural:
-                        card("/menu/natural/D2T1-pv2.jpg", [D2T1], classes)
+                        card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes)
                     if visible_D2T2_natural:
-                        card("/menu/natural/D2T2-pv2.jpg", [D2T2], classes)
+                        card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes)
                     if visible_D2T3_natural:
-                        card("/menu/natural/D2T3-pv2.jpg", [D2T3], classes)
+                        card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes)
 
 
         # Second column: Jun 6th 
@@ -653,11 +653,11 @@ body, html {
                 ui.label("Jun 6th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
                     if visible_D3T1_natural:
-                        card("/menu/natural/D3T1-pv2.jpg", [D3T1], classes)
+                        card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes)
                     if visible_D3T2_natural:
-                        card("/menu/natural/D3T2-pv2.jpg", [D3T2], classes)
+                        card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes)
                     if visible_D3T3_natural:
-                        card("/menu/natural/D3T3-pv2.jpg", [D3T3], classes)
+                        card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes)
 
        # Third column: Dec 25th 
         if (visible_D1T1_natural or visible_D1T2_natural or visible_D1T3_natural)and \
@@ -666,11 +666,11 @@ body, html {
                 ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
                     if visible_D1T1_natural:
-                        card("/menu/natural/D1T1-pv2.jpg", [D1T1], classes)
+                        card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes)
                     if visible_D1T2_natural:
-                        card("/menu/natural/D1T2-pv2.jpg", [D1T2], classes)
+                        card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes)
                     if visible_D1T3_natural:
-                        card("/menu/natural/D1T3-pv2.jpg", [D1T3], classes)
+                        card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes)
 
     
         update_all_cards_visibility()
