@@ -7,6 +7,9 @@ from fastapi import Request
 
 from fastapi.middleware.cors import CORSMiddleware
 
+IS_PRODUCTION = os.environ.get('RENDER') is not None
+NODE_BASE_URL = "/app" if IS_PRODUCTION else "http://127.0.0.1:3006"
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -145,7 +148,7 @@ def show_selected_images():
     label2 = f"{day2}<br><span>{label2_main}</span>" if day2 else label2_main
 
  
-    url = f"http://127.0.0.1:3006/index.html?img1={img1}&img2={img2}"
+    url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}"
 
    
     html = f"""
@@ -301,8 +304,6 @@ D3T2 = "Time: 11:53 am"
 D3T3 = "Time: 13:53 pm"
 
 @ui.page('/')
-
-
 def main():
     global iframe_container
     selected_cards.clear()
@@ -1381,5 +1382,4 @@ body, html {
     .style('height: calc(100vh - 50px); position: relative; z-index: 0; margin-left: -16px;')
 
 
-port = int(os.environ.get("PORT", 10000))
-ui.run(port=port)
+ui.run()

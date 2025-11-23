@@ -1,16 +1,19 @@
 #!/bin/bash
 
-echo "Instal·lant deps Python..."
-pip3 install -r menu/requirements.txt
+# 1. Reemplazar el puerto de escucha de Nginx con el que Render nos asigne ($PORT)
+sed -i "s/listen 10000;/listen $PORT;/g" /etc/nginx/nginx.conf
 
-echo "Iniciant NiceGUI..."
-cd menu || exit 1
-python3 main.py &  # Python en background
-PYTHON_PID=$!
+# 2. Iniciar Node (WebApp) en puerto 3000 en segundo plano
+echo "Iniciando Node..."
+cd webapp && PORT=3006 npm start &
 
-echo "Iniciant Node/Express..."
-cd ../webapp || exit 1
-npm start
+# 3. Iniciar NiceGUI (Menu) en puerto 8080 en segundo plano
+echo "Iniciando NiceGUI..."
+# Asegúrate de que tu main.py use ui.run(port=8080)
+cd menu && python3 main.py &
 
-echo "Node ha tancat, tancant Python..."
-kill $PYTHON_PID
+# 4. Iniciar Nginx en primer plano (para mantener el contenedor vivo)
+echo "Iniciando Nginx..."
+# Esperamos unos segundos para que Python y Node arranquen
+sleep 5
+nginx -g 'daemon off;'
