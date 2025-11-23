@@ -12,24 +12,20 @@ app.use('/jsm/', express.static(path.join(__dirname, 'node_modules/three/example
 // Function to check and install nicegui if necessary 
 function ensureNiceguiInstalled() {
   try {
-    execSync('python3 -m pip show nicegui', { stdio: 'ignore' })
-    
+    execSync('python3 -m venv venv', { stdio: 'inherit' });
+    execSync('./venv/bin/pip install nicegui', { stdio: 'inherit' });
   } catch (error) {
-
-    execSync('pip3 install nicegui', { stdio: 'inherit' })
+    console.error('Error creando entorno virtual o instalando NiceGUI:', error);
   }
 }
 
+
 // Start main.py
 function startPythonApp() {
-  // Absolute path to main.py inside the /menu folder
-  const mainPath = path.join(__dirname, '../menu/main.py')
-  
-
-  const pythonProcess = spawn('python3', [mainPath], { stdio: 'inherit' })
-  
-  
+  const mainPath = path.join(__dirname, '../menu/main.py');
+  const pythonProcess = spawn('./venv/bin/python', [mainPath], { stdio: 'inherit' });
 }
+
 
 //List of .EXR images
 function getEXRFiles(basePath, dir = '', arrayOfFiles = []) {
