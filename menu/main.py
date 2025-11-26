@@ -867,11 +867,11 @@ body, html {
                 ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
                     if visible_D2T1_all:
-                        card("/menu/natural/D2T1-pv2.jpg", [D2T1], classes)
+                        card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes)
                     if visible_D2T2_all:
-                        card("/menu/natural/D2T2-pv2.jpg", [D2T2], classes)
+                        card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes)
                     if visible_D2T3_all:
-                        card("/menu/natural/D2T3-pv2.jpg", [D2T3], classes)
+                        card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes)
 
 
         # Second column: Jun 6th 
@@ -881,11 +881,11 @@ body, html {
                 ui.label("Jun 6th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
                     if visible_D3T1_all:
-                        card("/menu/natural/D3T1-pv2.jpg", [D3T1], classes)
+                        card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes)
                     if visible_D3T2_all:
-                        card("/menu/natural/D3T2-pv2.jpg", [D3T2], classes)
+                        card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes)
                     if visible_D3T3_all:
-                        card("/menu/natural/D3T3-pv2.jpg", [D3T3], classes)
+                        card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes)
 
         # Third column: Dec 25th 
         if (visible_D1T1_all or visible_D1T2_all or visible_D1T3_all)and \
@@ -894,22 +894,22 @@ body, html {
                 ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
                 with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
                     if visible_D1T1_all:
-                        card("/menu/natural/D1T1-pv2.jpg", [D1T1], classes)
+                        card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes)
                     if visible_D1T2_all:
-                        card("/menu/natural/D1T2-pv2.jpg", [D1T2], classes)
+                        card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes)
                     if visible_D1T3_all:
-                        card("/menu/natural/D1T3-pv2.jpg", [D1T3], classes)
+                        card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes)
 
         #Artificial
 
         with cards_container_all4:
                 with ui.row().classes('gap-2 items-start').style('margin-top: 18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
                    
-                    card("/menu/artificial/C1-pv2.jpg", [C1], classes)
-                    card("/menu/artificial/C2-pv2.jpg", [C2], classes)
-                    card("/menu/artificial/C3-pv2.jpg", [C3], classes)
-                    card("/menu/artificial/C4-pv2.jpg", [C4], classes)
-                    card("/menu/artificial/C5-pv2.jpg", [C1, C2, C4], classes)
+                    card("/menu/Artificial/C1-pv2.jpg", [C1], classes)
+                    card("/menu/Artificial/C2-pv2.jpg", [C2], classes)
+                    card("/menu/Artificial/C3-pv2.jpg", [C3], classes)
+                    card("/menu/Artificial/C4-pv2.jpg", [C4], classes)
+                    card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes)
         
 
         #Nat+Art
@@ -1104,11 +1104,11 @@ body, html {
                     
                     with ui.row().classes('gap-2 items-start').style('margin-top: 20px; margin-left: -55px;'):
 
-                        card("/menu/artificial/C1-pv2.jpg", [C1], classes)
-                        card("/menu/artificial/C2-pv2.jpg", [C2], classes)
-                        card("/menu/artificial/C3-pv2.jpg", [C3], classes)
-                        card("/menu/artificial/C4-pv2.jpg", [C4], classes)
-                        card("/menu/artificial/C5-pv2.jpg", [C1, C2, C4], classes)
+                        card("/menu/Artificial/C1-pv2.jpg", [C1], classes)
+                        card("/menu/Artificial/C2-pv2.jpg", [C2], classes)
+                        card("/menu/Artificial/C3-pv2.jpg", [C3], classes)
+                        card("/menu/Artificial/C4-pv2.jpg", [C4], classes)
+                        card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes)
 
 
 
