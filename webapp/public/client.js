@@ -249,7 +249,7 @@ function getQueryParams() {
     };
 }
 
-const TEXTURE_BASE_PATH = '/app/textures/'; 
+const TEXTURE_BASE_PATH = '/textures/'; 
 
 function loadImagesFromUrlParams() {
     const { img1, img2 } = getQueryParams();
