@@ -104,7 +104,7 @@ const exrLoader = new EXRLoader();
 exrLoader.setDataType(THREE.FloatType); // --- CANVI: HalfFloat és més ràpid que Float
 const textureLoader = new THREE.TextureLoader(); // --- CANVI: Loader pels JPGs
 
-const TEXTURE_BASE_PATH = './textures/';
+const TEXTURE_BASE_PATH = '/app/textures/';
 
 // Variables d'estat per evitar que una càrrega antiga sobreescrigui una nova
 let currentLeftFile = "";
