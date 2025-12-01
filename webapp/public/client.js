@@ -104,7 +104,7 @@ const exrLoader = new EXRLoader();
 exrLoader.setDataType(THREE.FloatType); // --- CANVI: HalfFloat és més ràpid que Float
 const textureLoader = new THREE.TextureLoader(); // --- CANVI: Loader pels JPGs
 
-const TEXTURE_BASE_PATH = '/app/textures/';
+const TEXTURE_BASE_PATH = './textures/';
 
 // Variables d'estat per evitar que una càrrega antiga sobreescrigui una nova
 let currentLeftFile = "";
@@ -573,16 +573,14 @@ function updateDiffParams() {
 
 // Funció per enviar la selecció a Python
 async function notifyPython(selection) {
-    // ⚠️ IMPORTANT: Si estàs en local, descomenta la línia del localhost
-    // Si estàs a Render/Nginx (producció), deixa la relativa.
+    // ❌ MAL PARA PRODUCCIÓN:
+    // let url = 'http://localhost:8080/set_selected_window'; 
     
-    // Opció A: Producció / Nginx (mateix port)
-    // let url = '/set_selected_window'; 
-    
-    // Opció B: Desenvolupament Local (Python al port 8080, JS en un altre)
-    let url = 'http://localhost:8080/set_selected_window'; 
+    // ✅ BIEN (Ruta Relativa):
+    // Esto funciona tanto en local (si abres el puerto 8080) como en la nube.
+    let url = '/set_selected_window'; 
 
-    console.log(`📡 Enviant selecció '${selection}' a: ${url}`);
+    // console.log(`📡 Enviant selecció '${selection}' a: ${url}`);
 
     try {
         const response = await fetch(url, {
@@ -592,18 +590,13 @@ async function notifyPython(selection) {
             },
             body: JSON.stringify({ selected: selection })
         });
-
-        // Comprovem si el servidor ha respost OK (codi 200-299)
-        if (!response.ok) {
-            throw new Error(`Error HTTP del servidor: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("✅ Python actualitzat:", data);
+        
+        if (!response.ok) throw new Error(response.status);
+        // const data = await response.json(); // Opcional
 
     } catch (error) {
-        // Aquest console.warn evita que l'error aturi tot el programa
-        console.warn("⚠️ No s'ha pogut contactar amb Python (és normal si només proves el frontend):", error.message);
+        // En producción, silenciamos el error para no asustar al usuario si falla algo puntual
+        // console.warn("Error Python:", error);
     }
 }
 

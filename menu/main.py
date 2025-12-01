@@ -316,167 +316,164 @@ def main():
 
 
     ui.add_body_html("""
-<script>
+    <script>
 
-async function restoreSelectedWindow() {
-    const container = document.getElementById('container');
-    if (!container) return;
+    async function restoreSelectedWindow() {
+        const container = document.getElementById('container');
+        if (!container) return;
 
-    let saved = localStorage.getItem('selectedWindow');
+        let saved = localStorage.getItem('selectedWindow');
+        
+        // ✅ USAR RUTA RELATIVA (sin http://localhost...)
+        let url = '/set_selected_window';
 
-    if (saved) {
-    
-        updateSelectedWindowHighlight(saved);
-        await fetch('/set_selected_window', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({selected: saved})
-        });
-    } else {
-    
-        await fetch('/set_selected_window', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({selected: null})
+        if (saved) {
+            updateSelectedWindowHighlight(saved);
+            await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected: saved})
+            });
+        } else {
+            await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected: null})
+            });
+        }
+
+        container.addEventListener('click', async (e) => {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            let selectedWindow = (x < rect.width / 2) ? 'left' : 'right';
+
+            localStorage.setItem('selectedWindow', selectedWindow);
+            updateSelectedWindowHighlight(selectedWindow);
+
+            // ✅ USAR RUTA RELATIVA AQUÍ TAMBIÉN
+            await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected: selectedWindow})
+            });
         });
     }
 
-
-    container.addEventListener('click', async (e) => {
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        let selectedWindow = (x < rect.width / 2) ? 'left' : 'right';
-
-        localStorage.setItem('selectedWindow', selectedWindow);
-        updateSelectedWindowHighlight(selectedWindow);
-
-        await fetch('/set_selected_window', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({selected: selectedWindow})
-        });
-
-       
-    });
-}
+    window.addEventListener('load', restoreSelectedWindow);
+    </script>
+    """)
 
 
-window.addEventListener('load', restoreSelectedWindow);
-</script>
-
-""")
-
-
-    
-     
-
-    ui.add_head_html('''
-<style>
-body, html {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-}
-
-.menu-row {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    background-color: white;
-}
-                     
-
-
-
-.dropdown-panel {
-    position: absolute;
-    top: 70px;
-    left: 0;
-    right: 0;
-    height: 46vh;
-    background-color: white;
-    z-index: 50;
-    display: flex;
-    flex-direction: column; 
-    align-items: stretch;
-}
-
-
-.dropdown-panel .controls {
-    flex-shrink: 0; 
-    padding: 0 40px;
-    margin-top: 5px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 1.5rem;
-    align-items: center;
-}
-
-
-.dropdown-panel .cards-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    display: flex;
-    gap: 2.5rem;
-    padding: 10px;
-    flex-shrink: 0; 
-    padding-left:50px;
-}
-
-/* Fixed size for all cards */
-.dropdown-panel .q-card {
-    transform: scale(0.65); 
-    margin: -30px;         
-    display: flex;
-    flex-direction: column;
-    vertical-align: top;
-}
+        
         
 
-/* First thistle with more space on the left */
-.dropdown-panel .q-card:first-child {
-    margin-left: 20px;
-}
+    ui.add_head_html('''
+    <style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+    }
 
-/* Set the size of the image inside the card */
-.dropdown-panel .q-card .q-img {
-    width: 100%;       
-    height: 180px;     
-    object-fit: cover; 
-}
-
-/* Compact text below */
-.dropdown-panel .q-card__section {
-    
-    font-size: 1rem;
-    line-height: 1rem;
-    text-align: center;
-    justify-content:center;
-    
-}
-                              
-
-.material-symbols-outlined {
-  font-variation-settings:
-  'FILL' 0,
-  'wght' 200,
-  'GRAD' 0,
-  'opsz' 24
-}
-                     
+    .menu-row {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        background-color: white;
+    }
+                        
 
 
 
+    .dropdown-panel {
+        position: absolute;
+        top: 70px;
+        left: 0;
+        right: 0;
+        height: 46vh;
+        background-color: white;
+        z-index: 50;
+        display: flex;
+        flex-direction: column; 
+        align-items: stretch;
+    }
 
-                    
-</style>
-                     
+
+    .dropdown-panel .controls {
+        flex-shrink: 0; 
+        padding: 0 40px;
+        margin-top: 5px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1.5rem;
+        align-items: center;
+    }
 
 
-''')
+    .dropdown-panel .cards-wrapper {
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        display: flex;
+        gap: 2.5rem;
+        padding: 10px;
+        flex-shrink: 0; 
+        padding-left:50px;
+    }
+
+    /* Fixed size for all cards */
+    .dropdown-panel .q-card {
+        transform: scale(0.65); 
+        margin: -30px;         
+        display: flex;
+        flex-direction: column;
+        vertical-align: top;
+    }
+            
+
+    /* First thistle with more space on the left */
+    .dropdown-panel .q-card:first-child {
+        margin-left: 20px;
+    }
+
+    /* Set the size of the image inside the card */
+    .dropdown-panel .q-card .q-img {
+        width: 100%;       
+        height: 180px;     
+        object-fit: cover; 
+    }
+
+    /* Compact text below */
+    .dropdown-panel .q-card__section {
+        
+        font-size: 1rem;
+        line-height: 1rem;
+        text-align: center;
+        justify-content:center;
+        
+    }
+                                
+
+    .material-symbols-outlined {
+    font-variation-settings:
+    'FILL' 0,
+    'wght' 200,
+    'GRAD' 0,
+    'opsz' 24
+    }
+                        
+
+
+
+
+                        
+    </style>
+                        
+
+
+    ''')
 
 
 
