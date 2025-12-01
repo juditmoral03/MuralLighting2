@@ -3,57 +3,45 @@ console.log("Client started");
 import * as THREE from 'three';
 import { OrbitControls } from './jsm/controls/OrbitControls.js';
 import Stats from './jsm/libs/stats.module.js';
-import { GUI } from './jsm/libs/lil-gui.module.min.js'; // Import lil-gui for the exposure slider
-import { EXRLoader } from './jsm/loaders/EXRLoader.js'; // Ensure you have this loader
-// import analyzeTexture from './analyzeTexture.js'; // Import the analyzeTexture function
+import { GUI } from './jsm/libs/lil-gui.module.min.js'; 
+import { EXRLoader } from './jsm/loaders/EXRLoader.js'; 
 import toneMappingLinear from './toneMappingLinear.js';
-//import toneMappingLinearGamma from './toneMappingLinearGamma.js';
-import toneMappingReinhardBasic from './toneMappingReinhardBasic.js'; // Import the toneMappingReinhardBasic shader
+import toneMappingReinhardBasic from './toneMappingReinhardBasic.js'; 
 import toneMappingReinhardExtended from './toneMappingReinhardExtended.js'
 import toneMappingLuminance from './toneMappingLuminance.js'
 import ImageView from './imageView.js';
 import DifferenceWindow from './differenceWindow.js';
 import readTextFile from './shaderReader.js';
-// import colorMapTexture from './colorMapTexture.js';
-// import colorMapTextureDiff from './colorMapTextureDiff.js';
 
-const toneMappingMethods = [toneMappingLinear, toneMappingReinhardBasic, toneMappingReinhardExtended, toneMappingLuminance]; // Add more tone mapping methods here
-
+const toneMappingMethods = [toneMappingLinear, toneMappingReinhardBasic, toneMappingReinhardExtended, toneMappingLuminance]; 
 
 ///// Image Views
 
-// Create the color ops chunk
 var colorOpsGLSL = await readTextFile("shaders/colorOperations.glsl");
 THREE.ShaderChunk.ColorOps = colorOpsGLSL;
-window.three = THREE; // For debugging
+window.three = THREE; 
 
 // Left view
 const containerL = document.getElementById('window1');
 var leftView = new ImageView(containerL.clientWidth, containerL.clientHeight);
 containerL.appendChild(leftView.renderer.domElement);
-console.log("container size: " + containerL.clientWidth + " x " + containerL.clientHeight);
 
 // Right View
 const containerR = document.getElementById('window2');
 var rightView = new ImageView(containerR.clientWidth, containerR.clientHeight);
 containerR.appendChild(rightView.renderer.domElement);
 
-//Add interactive frames
+// Interactive frames
 containerL.classList.add('image-frame', 'hidden');
 containerR.classList.add('image-frame', 'hidden');
 
 let selectedWindow = '';
 
-// Only one frame visible at a time and save selection
-// Only one frame visible at a time and save selection
 containerL.addEventListener('click', () => {
     containerL.classList.remove('hidden');
     containerR.classList.add('hidden');
     selectedWindow = 'left';
     localStorage.setItem('selectedWindow', selectedWindow); 
-    console.log("Seleccionat: esquerra");
-    
-    // --- NUEVO: AVISAR A PYTHON ---
     notifyPython('left'); 
 });
 
@@ -62,36 +50,25 @@ containerR.addEventListener('click', () => {
     containerL.classList.add('hidden');
     selectedWindow = 'right';
     localStorage.setItem('selectedWindow', selectedWindow); 
-    console.log("Seleccionat: dreta");
-
-    // --- NUEVO: AVISAR A PYTHON ---
     notifyPython('right');
 });
 
-
 function applyStoredSelection() {
     const stored = localStorage.getItem('selectedWindow');
-    if (!stored) {
-        return;
-    }
+    if (!stored) return;
 
     if (stored === 'left') {
         containerL.classList.remove('hidden');
         containerR.classList.add('hidden');
         selectedWindow = 'left';
-        // Avisamos a Python al cargar la página
         notifyPython('left'); 
-        
     } else if (stored === 'right') {
         containerR.classList.remove('hidden');
         containerL.classList.add('hidden');
         selectedWindow = 'right';
-        // Avisamos a Python al cargar la página
         notifyPython('right');
     }
 }
-
-
 
 // Difference dialog
 const containerD = document.getElementById('winDiff');
@@ -100,9 +77,6 @@ var fs = await readTextFile("shaders/fs_difference.glsl");
 var difWin = new DifferenceWindow(vs, fs)
 difWin.renderer.setSize(containerD.clientWidth, containerD.clientHeight);
 containerD.appendChild(difWin.renderer.domElement);
-// console.log("container size: " + containerD.clientWidth + " x " + containerD.clientHeight);
-
-
 
 // Set up Orbit Controls
 const controlsL = new OrbitControls(leftView.camera, leftView.renderer.domElement);
@@ -113,132 +87,211 @@ controlsL.enableRotate = false;
 controlsR.enableRotate = false;
 controlsD.enableRotate = false;
 
-controlsL.mouseButtons = {
-	LEFT: THREE.MOUSE.PAN,
-	MIDDLE: THREE.MOUSE.DOLLY,
-	RIGHT: THREE.MOUSE.PAN
-}
+controlsL.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
+controlsR.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
+controlsD.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
 
-controlsR.mouseButtons = {
-	LEFT: THREE.MOUSE.PAN,
-	MIDDLE: THREE.MOUSE.DOLLY,
-	RIGHT: THREE.MOUSE.PAN
-}
-
-controlsD.mouseButtons = {
-	LEFT: THREE.MOUSE.PAN,
-	MIDDLE: THREE.MOUSE.DOLLY,
-	RIGHT: THREE.MOUSE.PAN
-}
-
-controlsL.addEventListener('change', () => {
-    syncCameraViews(controlsL, rightView.camera, controlsR);
-});
-
-controlsR.addEventListener('change', () => {
-    syncCameraViews(controlsR, leftView.camera, controlsL);
-});
-
-// Initialize stats for performance monitoring
-//const stats = Stats();
-//document.body.appendChild(stats.dom);
+controlsL.addEventListener('change', () => { syncCameraViews(controlsL, rightView.camera, controlsR); });
+controlsR.addEventListener('change', () => { syncCameraViews(controlsR, leftView.camera, controlsL); });
 
 // Tone mapping
-var toneMappingDefaultShaderCode = THREE.ShaderChunk.tonemapping_pars_fragment;
 leftView.renderer.toneMapping = THREE.CustomToneMapping; 
-leftView.renderer.toneMappingExposure = 1.0; // Default exposure value
+leftView.renderer.toneMappingExposure = 1.0; 
 
-
-///// EXR loading
-
-// // Luminance values used for tone mapping
-// var maxInputLuminance = null;
-// var avgInputLuminance = null;
-// var logAvgInputLuminance = null;
+///// EXR & JPG Loading (PROGRESSIVE)
 
 const exrLoader = new EXRLoader();
-exrLoader.setDataType(THREE.FloatType); 
+exrLoader.setDataType(THREE.FloatType); // --- CANVI: HalfFloat és més ràpid que Float
+const textureLoader = new THREE.TextureLoader(); // --- CANVI: Loader pels JPGs
 
-function loadLeftImage(texture = null) {
-    // Load image and update luminance values
-    if (texture) leftView.loadImage(texture, true);
+const TEXTURE_BASE_PATH = './textures/';
+
+// Variables d'estat per evitar que una càrrega antiga sobreescrigui una nova
+let currentLeftFile = "";
+let currentRightFile = "";
+
+let leftRequestID = 0;
+let rightRequestID = 0;
+
+// Variables per saber si l'EXR ja ha guanyat la carrera
+let leftEXRLoaded = false;
+let rightEXRLoaded = false;
+
+let leftTimeout = null;
+let rightTimeout = null;
+
+// --- CANVI: Nova lògica de càrrega progressiva ---
+function loadLeftImage(filename) {
+    if (!filename) return;
+    
+    // Cancel·lem la càrrega "Full" anterior si l'usuari canvia ràpid
+    if (leftTimeout) clearTimeout(leftTimeout);
+
+    leftRequestID++; 
+    const myRequestID = leftRequestID; 
+
+    // Neteja del nom base (traiem .exr)
+    let baseName = filename;
+    if (baseName.toLowerCase().endsWith('.exr')) {
+        baseName = baseName.substring(0, baseName.length - 4);
+    }
+
+    // 1. CÀRREGA PREVIEW (_small.exr)
+    // Utilitzem exrLoader, però carreguem l'arxiu petit.
+    const smallUrl = TEXTURE_BASE_PATH + baseName + '_small.exr';
+    
+    // console.log(`🔍 [ID:${myRequestID}] Buscant preview: ${baseName}_small.exr`);
+
+    exrLoader.load(smallUrl, (texture) => {
+        // Només apliquem si l'usuari no ha canviat d'imatge
+        if (myRequestID === leftRequestID) {
+            // console.log("✅ Small EXR carregat (Esquerra)");
+            updateLeftView(texture); 
+        }
+    }, undefined, (err) => {
+        // Si no existeix el _small, no passa res greu, esperarem al gran.
+        console.warn(`⚠️ No s'ha trobat ${baseName}_small.exr (Esquerra)`);
+    });
+
+    // 2. CÀRREGA FINAL (Original .exr)
+    // Esperem 200ms per no bloquejar la interfície si l'usuari passa el ratolí ràpid
+    leftTimeout = setTimeout(() => {
+        const fullUrl = TEXTURE_BASE_PATH + baseName + '.exr';
+        console.log(`🚀 [ID:${myRequestID}] Iniciant EXR Full (Background): ${baseName}`);
+
+        exrLoader.load(fullUrl, (texture) => {
+            if (myRequestID === leftRequestID) {
+                console.log(`✅ [ID:${myRequestID}] EXR Full carregat i aplicat.`);
+                
+                // Opcional: Si vols assegurar-te que s'allibera la memòria del small:
+                if(leftView.texture) leftView.texture.dispose();
+                
+                updateLeftView(texture);
+            } else {
+                texture.dispose(); // Si arriba tard, a la brossa
+            }
+        }, undefined, (err) => console.error("Error EXR Full Left:", err));
+
+    }, 200); // Retard de seguretat per fluïdesa del menú
+}
+
+
+// --- CANVI: Aquesta funció fa la feina real d'actualitzar la vista (abans es deia loadLeftImage) ---
+function updateLeftView(texture) {
+    if (!texture) return;
+
+    // DETECCIÓ ROBUSTA:
+    // Els EXR carregats tenen tipus Float (1015) o HalfFloat (1016).
+    // Els JPG tenen tipus UnsignedByte (1009).
+    const isHDR = (texture.type === THREE.FloatType || texture.type === THREE.HalfFloatType);
+
+    // Cridem a loadImage passant el flag isHDR
+    leftView.loadImage(texture, isHDR);
+
+    // Si és JPG, forcem manualment els uniforms per si imageView.js no ho ha fet
+    if (!isHDR) {
+        leftView.scene.traverse((object) => {
+            if (object.isMesh && object.material) {
+                object.material.uniforms.maxInputLuminance.value = 1.0;
+                object.material.uniforms.avgInputLuminance.value = 0.5; 
+                object.material.needsUpdate = true;
+            }
+        });
+    }
 
     applyStoredSelection();
 
-    // maxInputLuminance = leftView.maxInputLuminance;
-    // avgInputLuminance = leftView.avgInputLuminance;
-    // logAvgInputLuminance = leftView.logAvgInputLuminance;
-
-    // Update the L_white of extended reinhard
-    //toneMappingReinhardExtended.updateParameterValue("L_white", L.max);
-    //toneMappingReinhardExtended.updateParameterConfig("L_white", 0, L.max*2, L.max);
-    //console.log(toneMappingFolder.folders);
-
-    // // Find the Reinhard Folder
-    // var folder = toneMappingFolder.folders.find(f => f._title === "Reinhard Extended");
-    // if (folder) {
-    //     // Find the controller for the parameter based on its name
-    //     const controller = folder.controllers.find(ctrl => ctrl._name === "L White");
-    //     if (controller) {
-    //         // Update the GUI display
-    //         //controller.max(L.max*2);
-    //         //controller.updateDisplay();
-    //     } else console.log("NOT FOUND");
-    // }
-    
-    // // Find the Luminance Folder
-    // //toneMappingLuminance.updateParameterValue("Max_L", L.max);
-    // folder = toneMappingFolder.folders.find(f => f._title === "Luminance");
-    // if (folder) {
-    //     // Find the controller for the parameter based on its name
-    //     const controller = folder.controllers.find(ctrl => ctrl._name === "Max Luminance");
-    //     if (controller) {
-    //         // Update the GUI display
-    //     //      controller.max(L.max);
-    //     //      controller.updateDisplay();
-    //     } else console.log("NOT FOUND");
-    // }
-
-    // Use right-view normalization for this view too (overwrite computed values)
-    if (params.fixNormalization) {
+    // Sincronització normalització (només si els dos són HDR realment)
+    if (params.fixNormalization && isHDR) {
         leftView.maxInputLuminance = rightView.maxInputLuminance;
         leftView.avgInputLuminance = rightView.avgInputLuminance;
         leftView.logAvgInputLuminance = rightView.logAvgInputLuminance;
     }
 
-    // Update texture for difference
-    if (texture) difWin.leftTexture = texture;
-    difWin.uMaxLum = leftView.avgInputLuminance;   // needed for image overlay
+    // Actualitzar finestra diferència
+    difWin.leftTexture = texture;
+    difWin.uMaxLum = leftView.avgInputLuminance || 1.0; // Evita valors nuls
     recomputeDiff = true;
 
-    // Re-render view 
     render(leftView);
 }
 
-function loadRightImage(texture) {
-    // Load image and update luminance values
-    rightView.loadImage(texture);
-    // maxInputLuminance = rightView.maxInputLuminance;
-    // avgInputLuminance = rightView.avgInputLuminance;
-    // logAvgInputLuminance = rightView.logAvgInputLuminance;
+// --- CANVI: Mateixa lògica per la dreta ---
+function loadRightImage(filename) {
+    if (!filename) return;
 
-    // Update texture for difference
+    if (rightTimeout) clearTimeout(rightTimeout);
+
+    rightRequestID++;
+    const myRequestID = rightRequestID;
+
+    let baseName = filename;
+    if (baseName.toLowerCase().endsWith('.exr')) {
+        baseName = baseName.substring(0, baseName.length - 4);
+    }
+
+    // 1. PREVIEW (_small.exr)
+    const smallUrl = TEXTURE_BASE_PATH + baseName + '_small.exr';
+    
+    exrLoader.load(smallUrl, (texture) => {
+        if (myRequestID === rightRequestID) {
+            // console.log("✅ Small EXR carregat (Dreta)");
+            updateRightView(texture);
+        }
+    }, undefined, (err) => {
+        console.warn(`⚠️ No s'ha trobat ${baseName}_small.exr (Dreta)`);
+    });
+
+    // 2. FULL (.exr)
+    rightTimeout = setTimeout(() => {
+        const fullUrl = TEXTURE_BASE_PATH + baseName + '.exr';
+        console.log(`🚀 [ID:${myRequestID}] Iniciant EXR Full Dreta...`);
+
+        exrLoader.load(fullUrl, (texture) => {
+            if (myRequestID === rightRequestID) {
+                console.log(`✅ [ID:${myRequestID}] EXR Full Dreta carregat.`);
+                
+                if(rightView.texture) rightView.texture.dispose();
+                
+                updateRightView(texture);
+            } else {
+                texture.dispose();
+            }
+        }, undefined, (err) => console.error("Error EXR Full Right:", err));
+
+    }, 200); 
+}
+
+function updateRightView(texture) {
+    if (!texture) return;
+
+    const isHDR = (texture.type === THREE.FloatType || texture.type === THREE.HalfFloatType);
+
+    rightView.loadImage(texture, isHDR);
+
+    if (!isHDR) {
+        rightView.scene.traverse((object) => {
+            if (object.isMesh && object.material) {
+                object.material.uniforms.maxInputLuminance.value = 1.0;
+                object.material.uniforms.avgInputLuminance.value = 0.5;
+                object.material.needsUpdate = true;
+            }
+        });
+    }
+
     difWin.rightTexture = texture;
     recomputeDiff = true;
     
-    // Recompute left view too if needed
-    if (params.fixNormalization) loadLeftImage();
+    if (params.fixNormalization && leftView.texture) {
+        // Forcem un render de l'esquerra per actualitzar valors
+        render(leftView);
+    }
 
-    // Re-render view
     render(rightView);
 }
 
-function showSelectedImages() {
-    // Only if there are already two images selected
-    if (params.leftImage && params.rightImage) {
-        exrLoader.load('./textures/' + params.leftImage, loadLeftImage, undefined, loadingError);
-        exrLoader.load('./textures/' + params.rightImage, loadRightImage, undefined, loadingError);
-    }
+function loadingError(error) {
+    console.error('An error occurred while loading the texture:', error);
 }
 
 function getQueryParams() {
@@ -249,87 +302,55 @@ function getQueryParams() {
     };
 }
 
-const TEXTURE_BASE_PATH = '/app/textures/'; 
-
 function loadImagesFromUrlParams() {
     const { img1, img2 } = getQueryParams();
 
-    // Si Python nos envía imágenes, las cargamos INMEDIATAMENTE
     if (img1 && img2) {
         console.log("📥 Cargando desde URL (Python):", img1, img2);
         
         params.leftImage = img1;
         params.rightImage = img2;
 
-        // Intentamos actualizar los menús de la GUI si ya existen
         if (leftImageMenu && rightImageMenu) {
             leftImageMenu.setValue(img1);   
             rightImageMenu.setValue(img2);  
         } else {
-            // Si los menús no existen aún, cargamos las imágenes directamente usando la ruta absoluta
-            exrLoader.load(TEXTURE_BASE_PATH + img1, loadLeftImage, undefined, loadingError);
-            exrLoader.load(TEXTURE_BASE_PATH + img2, loadRightImage, undefined, loadingError);
+            // --- CANVI: Ara cridem loadLeftImage amb el NOM (string), no amb el loader
+            loadLeftImage(img1);
+            loadRightImage(img2);
         }
     }
 }
 
-// Call on page load
-//window.addEventListener('DOMContentLoaded', loadSelectedImagesFromURL);
-
-
-
-function loadingError(error) {
-    console.error('An error occurred while loading the EXR texture:', error);
-}
-
-
-
-
 
 ///// GUI
 
-// Parameters
 const params = {
     leftImage : '',
     rightImage : '',
     syncViews : true,
     fixNormalization : false,
     selectedTarget: 'both',
-    toneMappingMethodName: toneMappingMethods[1].name, // Default tone mapping method
-    maxDiff : 0.1,//1.0,
-    imgOverlay : 0.,//0.25,
+    toneMappingMethodName: toneMappingMethods[1].name, 
+    maxDiff : 0.1,
+    imgOverlay : 0.,
 };
 
-// Create the GUI
 const gui = new GUI();
 
-// // Image selection (temporary)
-// const leftImageMenu = gui.add(params, 'leftImage').name('Left Image').onChange((value) => {
-//     exrLoader.load('./textures/' + value, loadLeftImage, undefined, loadingError);
-// });
-// const rightImageMenu = gui.add(params, 'rightImage').name('Right Image').onChange((value) => {
-//     exrLoader.load('./textures/' + value, loadRightImage, undefined, loadingError);
-// });
-
-// Basic params
 gui.add(params, 'syncViews').name('Sync Views');
 
-// Tone mapping
 const toneMappingFolder = gui.addFolder('Tone Mapping');
 toneMappingFolder.add(params, 'selectedTarget', { 'Both Windows': 'both', 'Window 1': 'window1', 'Window 2': 'window2' }).name('Apply To');
 
-// Tone mapping selection dropdown
 var options = toneMappingMethods.map(method => method.name);
 toneMappingFolder.add(params, 'toneMappingMethodName', options).name('Tone mapping').onChange((value) => {
     updateFolders(value);
     updateToneMapping();
 });
 
-
-// To fix/share normalization between views
 toneMappingFolder.add(params, 'fixNormalization').name('Fix normalization');
 
-// Specific params of each method
 for (let method of toneMappingMethods) {
     const folder = toneMappingFolder.addFolder(method.name);
     for (const [_, param] of Object.entries(method.parameters)) {
@@ -337,46 +358,28 @@ for (let method of toneMappingMethods) {
     }
 }
 
-
-// toneMappingFolder.open();
 toneMappingFolder.close(); 
 updateFolders(params.toneMappingMethodName); 
 
-
-// Function to collapse other TM folders and expand the selected one
 function updateFolders(selectedOption) {
     toneMappingFolder.folders.forEach(folder => {
         const titleElement = folder.domElement.querySelector('.title');
-
         if (folder._title === selectedOption) {
             folder.open(); 
             folder.domElement.style.display = ''; 
-            if (titleElement) titleElement.style.display = 'none'; // 🔹 amaga el títol del mètode actiu
+            if (titleElement) titleElement.style.display = 'none'; 
         } else {
             folder.close(); 
             folder.domElement.style.display = 'none'; 
-            if (titleElement) titleElement.style.display = ''; // 🔹 mostra el títol quan no és actiu
+            if (titleElement) titleElement.style.display = ''; 
         }
     });
 }
 
-
-
-
-
-
-
-
-
-
-
-// Image difference params
 const imgDiffFolder = gui.addFolder('Image Difference');
 imgDiffFolder.add({ openDialog: () => openDialog() }, 'openDialog').name('Show Difference');
 imgDiffFolder.add(params, 'maxDiff', 0.001, 1.0).name('Max Difference').onChange((value) => updateDiffParams());
 imgDiffFolder.add(params, 'imgOverlay', 0.0, 1.0).name('Image Overlay').onChange((value) => updateDiffParams());
-// imgDiffFolder.close();
-
 
 
 ///// Input images
@@ -384,7 +387,6 @@ imgDiffFolder.add(params, 'imgOverlay', 0.0, 1.0).name('Image Overlay').onChange
 let leftImageMenu, rightImageMenu;
 let images = [];
 
-// Cargar lista de imágenes para el menú (Secundario)
 fetch('/app/images')
     .then(response => {
         if (!response.ok) throw new Error("No se pudo cargar la lista de imágenes");
@@ -393,29 +395,25 @@ fetch('/app/images')
     .then(files => {
         images = files;
 
-        // Creamos los menús del GUI
+        // --- CANVI: Ara el onChange crida la nostra funció wrapper amb el nom de l'arxiu ---
         leftImageMenu = gui.add(params, 'leftImage', images).name('Left Image').onChange((value) => {
             console.log("Cambio manual Left:", value);
-            exrLoader.load(TEXTURE_BASE_PATH + value, loadLeftImage, undefined, loadingError);
+            loadLeftImage(value); // Passem el string
         });
         
         rightImageMenu = gui.add(params, 'rightImage', images).name('Right Image').onChange((value) => {
             console.log("Cambio manual Right:", value);
-            exrLoader.load(TEXTURE_BASE_PATH + value, loadRightImage, undefined, loadingError);
+            loadRightImage(value); // Passem el string
         });
 
-        // Ocultar inputs extraños del GUI
         leftImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
         rightImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
 
-        // Una vez creado el menú, sincronizamos por si la URL ya traía imágenes
-        // (Esto evita que el menú sobrescriba la selección de Python)
         const { img1, img2 } = getQueryParams();
         if (img1 && img2) {
             leftImageMenu.setValue(img1);
             rightImageMenu.setValue(img2);
         } else {
-            // Si no hay nada en la URL, cargamos los primeros por defecto
             params.leftImage = images[0];
             params.rightImage = images[1];
             leftImageMenu.setValue(images[0]);
@@ -423,19 +421,15 @@ fetch('/app/images')
         }
     })
     .catch(error => {
-        console.warn('⚠️ Error cargando menú de imágenes (fetch failed). Cargando imágenes de URL igualmente.', error);
-        // Aunque falle el fetch del menú, CARGAMOS LAS IMÁGENES DE PYTHON
+        console.warn('⚠️ Error cargando menú fetch.', error);
         loadImagesFromUrlParams();
     });
 
-// EJECUCIÓN INMEDIATA:
-// No esperamos al fetch. Si hay parámetros en la URL, cargamos la escena ya.
 loadImagesFromUrlParams();
 
 
 ///// Rendering + Tone mapping
 
-// Apply selected method on the images
 function updateToneMapping() {
     const method = toneMappingMethods.find(method => method.name === params.toneMappingMethodName);
 
@@ -448,28 +442,22 @@ function updateToneMapping() {
         setToneMappingMethod(rightView.scene, method);
     }
 
-    render(); // Render the selected scenes
+    render(); 
 }
 
-// Handle window resizing
 window.addEventListener('resize', function () {
     leftView.resize(containerL.clientWidth, containerL.clientHeight);
     rightView.resize(containerR.clientWidth, containerR.clientHeight);
-
-    render(); // Re-render the scene after resizing
+    render(); 
 }, false);
 
-// Animation loop
 function animate() {
     requestAnimationFrame(animate);
-
     controlsL.update();
     controlsR.update();
-
     leftView.render();
     rightView.render();
 }
-// animate();
 
 function setToneMappingMethod(currentScene, method) {
     currentScene.traverse((object) => {
@@ -483,21 +471,13 @@ function setToneMappingMethod(currentScene, method) {
 function render(view = null) {
     const method = toneMappingMethods.find(method => method.name === params.toneMappingMethodName);
 
-    // Select views to update (if not provided)
     let viewsToUpdate = [];
-    if (view)
-        viewsToUpdate = [view];
-    else if (params.selectedTarget === 'both') {
-        viewsToUpdate = [leftView, rightView];
-    } else if (params.selectedTarget === 'window1') {
-        viewsToUpdate = [leftView];
-    } else if (params.selectedTarget === 'window2') {
-        viewsToUpdate = [rightView];
-    }
+    if (view) viewsToUpdate = [view];
+    else if (params.selectedTarget === 'both') viewsToUpdate = [leftView, rightView];
+    else if (params.selectedTarget === 'window1') viewsToUpdate = [leftView];
+    else if (params.selectedTarget === 'window2') viewsToUpdate = [rightView];
 
-    // Process views
     viewsToUpdate.forEach((currentView) => {
-        // Set tone mapping parameters
         setToneMappingMethod(currentView.scene, method);
 
         currentView.scene.traverse((object) => {
@@ -506,7 +486,6 @@ function render(view = null) {
                 object.material.uniforms.avgInputLuminance.value = currentView.avgInputLuminance;
                 object.material.uniforms.avg_L_w.value = currentView.logAvgInputLuminance;
 
-                // Apply tone mapping parameters
                 for (const [key, param] of Object.entries(method.parameters)) {
                     if (object.material.uniforms[key]) {
                         object.material.uniforms[key].value = param.value;
@@ -517,8 +496,6 @@ function render(view = null) {
                 object.material.needsUpdate = true;
             }
         });
-
-        // Render scene
         currentView.render();
     });
 }
@@ -527,77 +504,48 @@ let syncing = false;
 
 function syncCameraViews(sourceControls, targetCamera, targetControls) {
     if (!params.syncViews || syncing) return;
-
-    syncing = true; // Prevent recursive calls
-
-    // Copy position and orientation
+    syncing = true; 
     targetCamera.position.copy(sourceControls.object.position);
     targetCamera.quaternion.copy(sourceControls.object.quaternion);
-
-    // Copy zoom and ensure projection matrix is updated
     targetCamera.zoom = sourceControls.object.zoom;
     targetCamera.updateProjectionMatrix();
-
-    // Sync the target (focus point)
     targetControls.target.copy(sourceControls.target);
     targetControls.update();
-
-    syncing = false; // Allow further sync
+    syncing = false; 
 }
 
-// Start the animation loop
 animate();
-
-
 
 
 ///// Image difference
 
-// Reference the existing dialog and close button
-const dialog = document.getElementById('differenceDialog'); // Dialog container
-const dialogContent = document.getElementById('differenceView'); // Dialog content
-const dragHandle = document.getElementById('drag-handle');  // Dragging header
-const closeDialogButton = document.querySelector('.close-button'); // Close button inside dialog
+const dialog = document.getElementById('differenceDialog'); 
+const dragHandle = document.getElementById('drag-handle');  
+const closeDialogButton = document.querySelector('.close-button'); 
 let recomputeDiff = true;
 
-// Function to open the dialog
 function openDialog() {
-    // Display the dialog (+ overlay)
     dialog.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // Disable scrolling on the background
-
-    // Update parameters
+    document.body.style.overflow = 'hidden'; 
     difWin.updateDiffParams(params.maxDiff, params.imgOverlay);
-
-    // Show dialog (recomputing difference if necessary)
     difWin.show(containerD.clientWidth, containerD.clientHeight, recomputeDiff);
-    // console.log("container size: " + containerD.clientWidth + " x " + containerD.clientHeight);
-
-    recomputeDiff = false;  // to reopen dialog faster
+    recomputeDiff = false;  
 }
 
-// Function to close the dialog
 function closeDialog() {
-    dialog.style.display = 'none'; // Hide the dialog
-    document.body.style.overflow = 'auto'; // Re-enable scrolling
+    dialog.style.display = 'none'; 
+    document.body.style.overflow = 'auto'; 
 }
 
-// Add functionality to close the dialog
 closeDialogButton.addEventListener('click', closeDialog);
 
-// Optional: Close the dialog by clicking outside the content
 dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) {
-        closeDialog();
-    }
+    if (event.target === dialog) { closeDialog(); }
 });
 
-
-// Dragging variables
 let offsetX = 0, offsetY = 0;
 let isDragging = false;
 
-// When mouse is pressed on the dialog header, start dragging
 dragHandle.addEventListener('mousedown', (e) => {
     isDragging = true;
     offsetX = e.clientX - dialog.offsetLeft;
@@ -606,7 +554,6 @@ dragHandle.addEventListener('mousedown', (e) => {
     document.addEventListener('mouseup', onMouseUp);
 });
 
-// While dragging, update the dialog position
 function onMouseMove(e) {
     if (isDragging) {
         dialog.style.left = `${e.clientX - offsetX}px`;
@@ -614,28 +561,28 @@ function onMouseMove(e) {
     }
 }
 
-// When mouse is released, stop dragging
 function onMouseUp() {
     isDragging = false;
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
 }
 
-// update max delta value (using GUI control)
 function updateDiffParams() {
     difWin.updateDiffParams(params.maxDiff, params.imgOverlay);
 }
 
-// Función para enviar la selección a Python
+// Funció per enviar la selecció a Python
 async function notifyPython(selection) {
-    // Detectamos si estamos en producción (Render/Nginx) o local
-    // Si estamos en Nginx (Render), la ruta raíz / apunta a Python.
-    // Si estamos en local (Node puerto 3006), necesitamos apuntar al 8080 explícitamente.
+    // ⚠️ IMPORTANT: Si estàs en local, descomenta la línia del localhost
+    // Si estàs a Render/Nginx (producció), deixa la relativa.
     
-    let url = '/set_selected_window'; // Funciona en Render/Nginx
+    // Opció A: Producció / Nginx (mateix port)
+    // let url = '/set_selected_window'; 
     
-    // Si estás probando en local sin Nginx, descomenta la siguiente línea:
-    // url = 'http://localhost:8080/set_selected_window'; 
+    // Opció B: Desenvolupament Local (Python al port 8080, JS en un altre)
+    let url = 'http://localhost:8080/set_selected_window'; 
+
+    console.log(`📡 Enviant selecció '${selection}' a: ${url}`);
 
     try {
         const response = await fetch(url, {
@@ -645,12 +592,19 @@ async function notifyPython(selection) {
             },
             body: JSON.stringify({ selected: selection })
         });
+
+        // Comprovem si el servidor ha respost OK (codi 200-299)
+        if (!response.ok) {
+            throw new Error(`Error HTTP del servidor: ${response.status}`);
+        }
+
         const data = await response.json();
-        console.log("Python actualizado:", data);
+        console.log("✅ Python actualitzat:", data);
+
     } catch (error) {
-        console.error("Error contactando con Python:", error);
+        // Aquest console.warn evita que l'error aturi tot el programa
+        console.warn("⚠️ No s'ha pogut contactar amb Python (és normal si només proves el frontend):", error.message);
     }
 }
 
 window.addEventListener('DOMContentLoaded', applyStoredSelection);
-

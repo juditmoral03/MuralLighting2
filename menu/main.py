@@ -5,7 +5,10 @@ from fastapi import Request
 from nicegui import app
 from fastapi import Request
 
+
 from fastapi.middleware.cors import CORSMiddleware
+
+
 
 IS_PRODUCTION = os.environ.get('RENDER') is not None
 NODE_BASE_URL = "/app" if IS_PRODUCTION else "http://127.0.0.1:3006"
@@ -484,35 +487,36 @@ body, html {
 
 
     with ui.row().classes('menu-row overflow-x-auto no-scrollbar flex-nowrap').style('white-space: nowrap; justify-content: center; gap: 2rem; padding: 0 20px;'):
+        # Guardem quin panell està obert per no haver de tancar-los tots de cop (optimització Python)
         active_panel = {'name': None}
 
         def show_panel(e, cat):
-            # hide all panels
-            for name, p in menu_panels.items():
-                p.set_visibility(False)
-            # show only what is relevant
+            # Optimització: Només tanquem el que estigui obert actualment
+            current = active_panel['name']
+            if current and current in menu_panels and current != cat:
+                menu_panels[current].set_visibility(False)
+            
+            # Mostrem el nou si no és "Inici"
             if cat != "Inici":
                 menu_panels[cat].set_visibility(True)
                 active_panel['name'] = cat
+            else:
+                active_panel['name'] = None
 
         for cat in categories:
             if cat == "Inici":
-                
                 ui.icon('home', size='28px')\
                     .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
                     .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
             elif cat == "Natural illumination":
-               
                 ui.icon('sunny', size='28px')\
                     .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
                     .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
             elif cat == "Artificial illumination":
-                
                 ui.icon('lightbulb_2', size='28px')\
                     .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
                     .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
             elif cat == "Natural + Artificial illumination":
-                
                 with ui.row().classes(
                     'cursor-pointer px-2 py-2 rounded hover:bg-gray-100 transition flex-shrink-0'
                 ).style('gap: 4px;').on('mouseover', lambda e, cat=cat: show_panel(e, cat)):
@@ -521,7 +525,6 @@ body, html {
                     ui.icon('lightbulb_2', size='28px').classes('material-symbols-outlined')
 
             elif cat == "All combinations":
-              
                 ui.label('ALL')\
                     .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 items-center')\
                     .style('font-size: 18px;font-weight: 300;')\
@@ -531,13 +534,18 @@ body, html {
 
 
     # FOLDABLE PANEL
+    # FOLDABLE PANEL
     for cat in categories:
+        # Creamos el panel
         with ui.column().classes('dropdown-panel') as panel:
             panel.set_visibility(False)
             menu_panels[cat] = panel
 
-            # When it leaves the panel, we hide it
+            # 1. Lógica Python (Sincronización del estado en el servidor)
+            # Esto mantiene a Python enterado de que el panel se cerró, aunque llegue con retraso.
             panel.on('mouseleave', lambda e, cat=cat: menu_panels[cat].set_visibility(False))
+
+          
 
 
 

@@ -1,14 +1,14 @@
 /* This module provides a class to encapsulate the widget where we show each image */
 
 import * as THREE from 'three';
-import analyzeTexture from './analyzeTexture.js'; // Import the analyzeTexture function
+import analyzeTexture from './analyzeTexture.js'; 
 import colorMapTexture from './colorMapTexture.js';
 
 const VS = `
       varying vec2 vUv;
   
       void main() {
-        vUv = uv; // Pass UV coordinates to the fragment shader
+        vUv = uv; 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
@@ -18,7 +18,7 @@ const FS = `
   
       void main() {
         vec4 textureColor = texture2D(uTexture, vUv);
-        gl_FragColor = vec4(CustomToneMapping(textureColor.rgb),1.0); // Set the color of the fragment to the sampled texture color
+        gl_FragColor = vec4(CustomToneMapping(textureColor.rgb),1.0); 
       }
     `;
 
@@ -35,69 +35,65 @@ class ImageView {
         this.maxInputLuminance = null;
         this.avgInputLuminance = null;
         this.logAvgInputLuminance = null;
+        this.texture = null;
     }
 
-    loadImage(texture, log_properties=false) {
-        console.log("Loading texture ...");
+    // ⚠️ CANVI IMPORTANT: Afegim el paràmetre 'isHDR'
+    loadImage(texture, isHDR = true, log_properties = false) {
+        console.log(`Loading texture... (Is HDR: ${isHDR})`);
 
+        // Netejem l'escena anterior (evita que es barregin JPG i EXR)
+        while(this.scene.children.length > 0){ 
+            const object = this.scene.children[0];
+            if (object.geometry) object.geometry.dispose();
+            if (object.material) object.material.dispose();
+            this.scene.remove(object); 
+        }
+
+        this.texture = texture;
         const t_width = texture.image.width;
         const t_height = texture.image.height;
         const aspectRatio = t_width / t_height;
     
-        // Analyze the texture
-        const {r, g, b, L} = analyzeTexture(texture); // max and min RGB values of the texture
-        this.maxInputLuminance = Math.max(r.max, g.max, b.max);
-        this.avgInputLuminance = (r.average/3 + g.average/3 + b.average/3);
-        // this.maxInputLuminance = 0.2126 * r.max + 0.7152 * g.max + 0.0722 * b.max;
-        // this.avgInputLuminance = 0.2126 * r.average + 0.7152 * g.average + 0.0722 * b.average;
-        this.logAvgInputLuminance = L.average;
+        // ⚠️ CANVI VITAL: Només analitzem si és HDR. Si és JPG, ens ho saltem.
+        if (isHDR) {
+            const {r, g, b, L} = analyzeTexture(texture); 
+            this.maxInputLuminance = Math.max(r.max, g.max, b.max);
+            this.avgInputLuminance = (r.average/3 + g.average/3 + b.average/3);
+            this.logAvgInputLuminance = L.average;
 
-        // Log the properties of the texture
-        if (log_properties) {
-            console.log('Texture properties:',
-                '\n  Format:', texture.format,
-                '\n  Type:', texture.type,
-                '\n  Size:', texture.image.width, 'x', texture.image.height,
-                '\n  Mipmap generation:', texture.generateMipmaps,
-                '\n  MinFilter:', texture.minFilter,
-                '\n  MagFilter:', texture.magFilter);
-
-            console.log('Texture RGB Analysis:',
-                `\n  Red - Min: ${r.min}, Max: ${r.max}, Sum: ${r.sum}, Count:${r.count}, Avg: ${r.average}`,
-                `\n  Green - Min: ${g.min}, Max: ${g.max}, Sum: ${g.sum}, Count:${g.count}, Avg: ${g.average}`,
-                `\n  Blue - Min: ${b.min}, Max: ${b.max}, Sum: ${b.sum}, Count:${b.count}, Avg: ${b.average}`,
-                '\n  Max input luminance:', this.maxInputLuminance,
-                '\n  Avg input luminance:', this.avgInputLuminance,
-                '\n  Log Avg input L:', this.logAvgInputLuminance,
-                '\n  Max input L:', L.max);
+            if (log_properties) {
+                console.log('Texture properties:', L.max);
+            }
+        } else {
+            // Valors segurs per defecte per JPG
+            this.maxInputLuminance = 1.0;
+            this.avgInputLuminance = 0.5;
+            this.logAvgInputLuminance = 0.5;
         }
         
-        // Create a material using the texture
+        // Creem el material
         this.material = new THREE.ShaderMaterial({
             uniforms: {
-                uTexture: { type: 't', value: texture }, // Add the texture as a uniform
-                maxInputLuminance: { value: () => this.maxInputLuminance },
-                avgInputLuminance: { value: () => this.avgInputLuminance },
-                avg_L_w:           { value: () => this.logAvgInputLuminance },
+                uTexture: { type: 't', value: texture }, 
+                maxInputLuminance: { value: this.maxInputLuminance },
+                avgInputLuminance: { value: this.avgInputLuminance },
+                avg_L_w:           { value: this.logAvgInputLuminance },
                 uColorMap:         { type: 't', value: colorMapTexture}
             },
             toneMapped: false,
             vertexShader: VS,
             fragmentShader: FS
         });
+
         this.material.originalFragmentShader = this.material.fragmentShader;
         this.material.fragmentShader = "vec3 CustomToneMapping( vec3 color ) {return color;}" + this.material.originalFragmentShader;
     
-        // Create a plane geometry for displaying the image
-        const geometry = new THREE.PlaneGeometry(3.2 * aspectRatio, 3.2); // Adjust the size as needed for the image
-    
-        // Create a mesh using the geometry and material
+        const geometry = new THREE.PlaneGeometry(3.2 * aspectRatio, 3.2); 
         const mesh = new THREE.Mesh(geometry, this.material);
-        mesh.position.set(0, 0, 0); // Center the mesh in the scene
+        mesh.position.set(0, 0, 0); 
     
-        // Add mesh to the scene
         this.scene.add(mesh);
-        
         console.log("Done");
     }    
 
@@ -112,4 +108,4 @@ class ImageView {
     }
 }
 
-export default ImageView
+export default ImageView;
