@@ -32,25 +32,46 @@ var rightView = new ImageView(containerR.clientWidth, containerR.clientHeight);
 containerR.appendChild(rightView.renderer.domElement);
 
 // Interactive frames
+// Interactive frames
 containerL.classList.add('image-frame', 'hidden');
 containerR.classList.add('image-frame', 'hidden');
 
-let selectedWindow = '';
+let selectedWindow = ''; // Inicialmente vacío
 
+// CLICK EN VENTANA IZQUIERDA
 containerL.addEventListener('click', () => {
-    containerL.classList.remove('hidden');
-    containerR.classList.add('hidden');
-    selectedWindow = 'left';
-    localStorage.setItem('selectedWindow', selectedWindow); 
-    notifyPython('left'); 
+    if (selectedWindow === 'left') {
+        // Si ya estaba seleccionada, la deseleccionamos
+        containerL.classList.add('hidden'); // Ocultamos borde
+        selectedWindow = ''; // Estado vacío
+        localStorage.removeItem('selectedWindow'); 
+        //notifyPython(null); // Enviamos null a Python
+    } else {
+        // Si NO estaba seleccionada, la activamos (y desactivamos la otra)
+        containerL.classList.remove('hidden'); // Mostramos borde
+        containerR.classList.add('hidden');    // Ocultamos borde derecha
+        selectedWindow = 'left';
+        localStorage.setItem('selectedWindow', selectedWindow); 
+        //notifyPython('left'); 
+    }
 });
 
+// CLICK EN VENTANA DERECHA
 containerR.addEventListener('click', () => {
-    containerR.classList.remove('hidden');
-    containerL.classList.add('hidden');
-    selectedWindow = 'right';
-    localStorage.setItem('selectedWindow', selectedWindow); 
-    notifyPython('right');
+    if (selectedWindow === 'right') {
+        // Si ya estaba seleccionada, la deseleccionamos
+        containerR.classList.add('hidden'); // Ocultamos borde
+        selectedWindow = ''; // Estado vacío
+        localStorage.removeItem('selectedWindow');
+        //notifyPython(null);
+    } else {
+        // Si NO estaba seleccionada, la activamos (y desactivamos la otra)
+        containerR.classList.remove('hidden'); // Mostramos borde
+        containerL.classList.add('hidden');    // Ocultamos borde izquierda
+        selectedWindow = 'right';
+        localStorage.setItem('selectedWindow', selectedWindow); 
+        //notifyPython('right');
+    }
 });
 
 function applyStoredSelection() {
@@ -61,12 +82,12 @@ function applyStoredSelection() {
         containerL.classList.remove('hidden');
         containerR.classList.add('hidden');
         selectedWindow = 'left';
-        notifyPython('left'); 
+        //notifyPython('left'); 
     } else if (stored === 'right') {
         containerR.classList.remove('hidden');
         containerL.classList.add('hidden');
         selectedWindow = 'right';
-        notifyPython('right');
+        //notifyPython('right');
     }
 }
 
@@ -572,13 +593,23 @@ function updateDiffParams() {
 }
 
 // Funció per enviar la selecció a Python
+// Funció per enviar la selecció a Python
 async function notifyPython(selection) {
-    // ❌ MAL PARA PRODUCCIÓN:
-    // let url = 'http://localhost:8080/set_selected_window'; 
     
-    // ✅ BIEN (Ruta Relativa):
-    // Esto funciona tanto en local (si abres el puerto 8080) como en la nube.
-    let url = '/set_selected_window'; 
+    // --- CORRECCIÓN IMPORTANTE ---
+    // En local, el JS vive en el puerto 3006 y Python en el 8080.
+    // Debemos poner la URL completa de Python.
+    // Si estás en producción (Render), probablemente ambos estén bajo el mismo dominio, 
+    // así que podrías necesitar una comprobación.
+    
+    let url;
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+        // Modo LOCAL: Apuntamos al puerto de NiceGUI (8080)
+        url = 'http://127.0.0.1:8080/set_selected_window';
+    } else {
+        // Modo PRODUCCIÓN: Asumimos que están en el mismo dominio
+        url = '/set_selected_window';
+    }
 
     // console.log(`📡 Enviant selecció '${selection}' a: ${url}`);
 
@@ -592,11 +623,9 @@ async function notifyPython(selection) {
         });
         
         if (!response.ok) throw new Error(response.status);
-        // const data = await response.json(); // Opcional
 
     } catch (error) {
-        // En producción, silenciamos el error para no asustar al usuario si falla algo puntual
-        // console.warn("Error Python:", error);
+        console.warn("⚠️ Error conectando con Python:", error);
     }
 }
 

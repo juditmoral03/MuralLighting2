@@ -64,18 +64,19 @@
             color: #333;
         }
 
+        /* Estilo base para el borde */
         .image-frame {
-            border: 5px solid #fffc54;
-        
-
+            border: 5px solid transparent; /* Transparente por defecto */
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            box-sizing: border-box; /* Importante para que el borde no cambie el tamaño */
+        }
+
+        /* Estilo cuando está seleccionada (quitamos la clase 'hidden') */
+        .image-frame.selected {
+            border-color: #fffc54;
             box-shadow: 0 0 15px white;
         }
-
-        .image-frame.hidden {
-            border-color: transparent;
-            box-shadow: none;
-        }
+        
     </style>
 
     <script async src="https://unpkg.com/es-module-shims@1.6.2/dist/es-module-shims.js"></script>
@@ -89,8 +90,8 @@
 </head>
 
 <body>
-    <div id="window1" class="threejs-window"></div>
-    <div id="window2" class="threejs-window"></div>
+    <div id="window1" class="threejs-window image-frame"></div>
+    <div id="window2" class="threejs-window image-frame"></div>
 
     <div id="differenceDialog" class="dialog">
         <div id="differenceView" class="dialog-content">
@@ -100,8 +101,6 @@
         </div>
     </div>
 
-
-
     <script type="module" src="client.js"></script>
 
     <script>
@@ -109,37 +108,58 @@
             const containerL = document.getElementById('window1');
             const containerR = document.getElementById('window2');
 
-            let selectedWindow = null;
+            // Función para actualizar SOLO la parte visual (bordes)
+            function updateVisualSelection(selected) {
+                // 1. Limpiamos ambos primero
+                containerL.classList.remove('selected');
+                containerR.classList.remove('selected');
 
-            containerL.addEventListener('click', () => {
-                containerL.classList.remove('hidden');
-                containerR.classList.add('hidden');
-                selectedWindow = 'left';
-                console.log("Seleccionat: esquerra");
-                fetch('http://127.0.0.1:8080/set_selected_window', {  
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selected: 'left' })
-                })
-            });
+                // 2. Activamos solo el que toque (si no es null)
+                if (selected === 'left') {
+                    containerL.classList.add('selected');
+                } else if (selected === 'right') {
+                    containerR.classList.add('selected');
+                }
+            }
 
-            containerR.addEventListener('click', () => {
-                containerR.classList.remove('hidden');
-                containerL.classList.add('hidden');
-                selectedWindow = 'right';
-                console.log("Seleccionat: dreta");
-                fetch('http://127.0.0.1:8080/set_selected_window', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selected: 'right' })
-                })
+            // Función central que gestiona la lógica de selección/deselección
+            function handleSelection(clickedWindow) {
+                // Leer qué tenemos guardado ahora mismo
+                const currentSelection = localStorage.getItem('selectedWindow');
+                let finalSelection = clickedWindow;
 
-            });
+                // --- LÓGICA DE TOGGLE (INTERRUPTOR) ---
+                // Si lo que he clicado es igual a lo que ya tenía seleccionado...
+                if (currentSelection === clickedWindow) {
+                    finalSelection = null; // ...entonces lo deselecciono.
+                    console.log("Deseleccionando ventana");
+                } else {
+                    console.log("Seleccionando:", finalSelection);
+                }
+
+                // 1. Guardar o borrar en localStorage
+                if (finalSelection) {
+                    localStorage.setItem('selectedWindow', finalSelection);
+                } else {
+                    localStorage.removeItem('selectedWindow');
+                }
+
+                // 2. Actualizar visuales (bordes amarillos)
+                updateVisualSelection(finalSelection);
+
+                // 3. Avisar a Python (NiceGUI)
+                window.parent.postMessage({ type: 'window_selected', value: finalSelection }, '*');
+            }
+
+            // Restaurar estado al cargar la página
+            const saved = localStorage.getItem('selectedWindow');
+            if (saved) updateVisualSelection(saved);
+
+            // Listeners simplificados
+            containerL.addEventListener('click', () => handleSelection('left'));
+            containerR.addEventListener('click', () => handleSelection('right'));
         });
     </script>
 
-
-
 </body>
-
 </html>

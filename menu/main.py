@@ -1,18 +1,12 @@
 from nicegui import ui, app
-import os,json
+import os
 from fastapi import Request
-
-from nicegui import app
-from fastapi import Request
-
-
 from fastapi.middleware.cors import CORSMiddleware
 
-
+# --- CONFIGURACIÓN E INICIALIZACIÓN ---
 
 IS_PRODUCTION = os.environ.get('RENDER') is not None
 NODE_BASE_URL = "/app" if IS_PRODUCTION else "http://127.0.0.1:3006"
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,1370 +15,573 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-"""def load_selected():
-    if os.path.exists("selected.json"):
-        with open("selected.json") as f:
-            return json.load(f).get("selected")
-    return None
-
-def save_selected(value):
-    with open("selected.json", "w") as f:
-        json.dump({"selected": value}, f)"""
-
-selected_window = None #load_selected()
-
-@app.post('/set_selected_window')
-async def set_selected_window(request: Request):
-    global selected_window
-    data = await request.json()
-    selected_window = data.get('selected') or "none"
-    #save_selected(selected_window)
-    return {'status': 'ok', 'selected': selected_window}
-
-
-@app.get('/get_selected_window')
-async def get_selected_window():
-    return {'selected': selected_window or "none"}  
-
+# NOTA: Hemos eliminado las variables globales y el endpoint @app.post('/set_selected_window')
+# porque causan conflictos entre usuarios.
 
 menu_path = os.path.dirname(__file__) 
 app.add_static_files('/menu', menu_path)
 
-selected_cards = []
-all_cards = {}
-iframe_container = None
-visible_D2T1_natural = True
-visible_D2T2_natural = True
-visible_D2T3_natural = True
-visible_D3T1_natural = True
-visible_D3T2_natural = True
-visible_D3T3_natural = True
-visible_D1T1_natural = True
-visible_D1T2_natural = True
-visible_D1T3_natural = True
-
-visible_D1T3_C2_natart = True
-visible_D1T3_C5_natart = True
-visible_D2T3_C2_natart = True
-visible_D2T3_C5_natart = True
-
-visible_D2T1_all = True
-visible_D2T2_all = True
-visible_D2T3_all = True
-visible_D3T1_all = True
-visible_D3T2_all = True
-visible_D3T3_all = True
-visible_D1T1_all = True
-visible_D1T2_all = True
-visible_D1T3_all = True
-
-visible_D1T3_C2_all = True
-visible_D1T3_C5_all = True
-visible_D2T3_C2_all = True
-visible_D2T3_C5_all = True
-
-
-visible_C1_all = True
-visible_C2_all = True
-visible_C3_all = True
-visible_C4_all = True
-visible_C5_all = True
-
-
-natural_hour= None
-natural_day= None
-
-natart_hour= None
-natart_day= None
-
-all_hour= None
-all_day= None
-
-
+# CONSTANTS
+C1, C2, C3, C4 = "Hanging oil lamp", "Two table candles", "Two floor chandeliers", "Four floor chandeliers"
+D1T1, D1T2, D1T3 = "Time: 10:00 am", "Time: 10:53 am", "Time: 12:53 pm"
+D2T1, D2T2, D2T3 = "Time: 10:00 am", "Time: 10:56 am", "Time: 13:56 pm"
+D3T1, D3T2, D3T3 = "Time: 10:00 am", "Time: 11:53 am", "Time: 13:53 pm"
 DEFAULT_IMAGE = "XII/Artificial/C1-pv2.exr"
 DEFAULT_IMAGE2 = "XII/Artificial/C2-pv2.exr"
 
-
-selected_left = None
-selected_right = None
-# Helper functions
-
-def show_selected_images():
-    def format_exr(image_name):
-        if image_name.startswith('/menu/'):
-            image_name = image_name[len('/menu/'):]
-        parts = image_name.rsplit('/', 1)
-        folder = parts[0]
-        file_name = parts[1].rsplit('.', 1)[0]
-        folder = folder.replace('+', '%2B')
-        return f"XII/{folder}/{file_name}.exr"
-
-    def format_label_text(text):
-        if isinstance(text, list):
-            return "<br>".join(str(t) for t in text)
-        return str(text)
-
-    def infer_day_from_image(image_path):
-        if not image_path:
-            return None
-        if "D2" in image_path:
-            return "Apr 1st"
-        elif "D3" in image_path:
-            return "Jun 6th"
-        elif "D1" in image_path:
-            return "Dec 25th"
-        return None
-
-    
-    img1 = format_exr(selected_left["image"]) if selected_left else DEFAULT_IMAGE
-    img2 = format_exr(selected_right["image"]) if selected_right else DEFAULT_IMAGE2
-
-    label1_main = format_label_text(selected_left["text"]) if selected_left else "Hanging oil lamp"
-    label2_main = format_label_text(selected_right["text"]) if selected_right else "Two table candles"
-
- 
-    day1 = infer_day_from_image(selected_left["image"]) if selected_left else None
-    day2 = infer_day_from_image(selected_right["image"]) if selected_right else None
-
- 
-    label1 = f"{day1}<br><span>{label1_main}</span>" if day1 else label1_main
-    label2 = f"{day2}<br><span>{label2_main}</span>" if day2 else label2_main
-
- 
-    url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}"
-
-   
-    html = f"""
-    <div style="position: relative; width: 100%; height: 100%;">
-        <iframe 
-            src="{url}" 
-            style="width:100%; height:100%; border:none; position: absolute; top:0; left:0; z-index:0;"
-            allowfullscreen
-            loading="lazy">
-        </iframe>
-
-        <!-- Labels -->
-        <div style="
-            position: absolute;
-            bottom: 60px;
-            left: 25%;
-            transform: translateX(-50%);
-            font-size: 12px;
-            font-weight: 500;
-            color: #eee;
-            text-align: center;
-            text-shadow: 0 0 5px rgba(0,0,0,0.6);
-            z-index: 2;
-        ">{label1}</div>
-
-        <div style="
-            position: absolute;
-            bottom: 60px;
-            left: 75%;
-            transform: translateX(-50%);
-            font-size: 12px;
-            font-weight: 500;
-            color: #eee;
-            text-align: center;
-            text-shadow: 0 0 5px rgba(0,0,0,0.6);
-            z-index: 2;
-        ">{label2}</div>
-    </div>
-    """
-    return html
-
-
-
-
-def update_all_cards_visibility():
-    selected_images = []
-    if selected_left:
-        selected_images.append(selected_left["image"])
-    if selected_right:
-        selected_images.append(selected_right["image"])
-
-    for image, buttons in all_cards.items():
-        for button in buttons:
-            button.set_visibility(False)
-            button.props('flat fab')  
-
-            if image == (selected_left["image"] if selected_left else None):
-                button.set_visibility(True)
-                button.props('color=white')
-                button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[15px] flex items-center justify-center')
-                button._text = "L"
-
-            elif image == (selected_right["image"] if selected_right else None):
-                button.set_visibility(True)
-                button.props('color=white')
-                button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[15px] flex items-center justify-center')
-                button._text = "R"
-
-
-
-def card(image, text, classes, max_selected=2):
-    with ui.card().tight().classes(classes) as c:
-        with ui.image(image) as img:
-        
-            button = ui.button('', on_click=None).props('flat color=white').classes('absolute top-2 right-2 m-1 bg-white text-black font-bold text-[15px] flex items-center justify-center')
-            button.set_visibility(False)
-            button.style('''
-                width: 22px !important;
-                height: 22px !important;
-                min-width: 0 !important;
-                min-height: 0 !important;
-                border-radius: 50% !important;
-                font-size: 10px !important;
-                padding: 0 !important;
-            ''')
-
-
-            if image not in all_cards:
-                all_cards[image] = []
-            all_cards[image].append(button)
-
-            def toggle_selection():
-                global selected_left, selected_right, iframe_container, selected_window
-
-                
-                if not selected_window:
-                    ui.notify("⚠️ Select a window", color='orange')
-                    return
-
-               
-                if selected_window == "left":
-                    selected_left = {"card": c, "image": image, "text": text}
-                    update_all_cards_visibility()
-                    if iframe_container:
-                        iframe_container.content = show_selected_images()
-                    return
-
-                
-                if selected_window == "right":
-                    selected_right = {"card": c, "image": image, "text": text}
-                    update_all_cards_visibility()
-                    if iframe_container:
-                        iframe_container.content = show_selected_images()
-                    return
-
-            img.on('click', toggle_selection)
-
-        with ui.card_section():
-            if isinstance(text, list):
-                for t in text:
-                    ui.markdown(t)
-            else:
-                ui.markdown(text)
-
-
-
-
-
-# Category data
-NATURAL = "**Natural illumination**: "
-NAT_NONE = "**Natural illumination**: no"
-ARTIFICIAL = "**Artificial illumination**: "
-ART_NONE = "**Artificial illumination**: no"
-C1 = "Hanging oil lamp"
-C2 = "Two table candles"
-C3 = "Two floor chandeliers"
-C4 = "Four floor chandeliers"
-
-D1 = "Dec 25th"
-D2 = "Apr 1st"
-D3 = "Jun 6th"
-DD1 = f"Date: {D1}"
-DD2 = f"Date: {D2}"   
-DD3 = f"Date: {D3}"
-D1T1 = "Time: 10:00 am"
-D1T2 = "Time: 10:53 am"
-D1T3 = "Time: 12:53 pm"
-D2T1 = "Time: 10:00 am"
-D2T2 = "Time: 10:56 am"
-D2T3 = "Time: 13:56 pm"
-D3T1 = "Time: 10:00 am"
-D3T2 = "Time: 11:53 am"
-D3T3 = "Time: 13:53 pm"
+# --- PÁGINA PRINCIPAL ---
 
 @ui.page('/')
-def main():
-    global iframe_container
-    selected_cards.clear()
+async def main():
+    # --- 1. ESTADO DE SESIÓN (ÚNICO POR USUARIO) ---
+    class SessionState:
+        def __init__(self):
+            self.hour = None
+            self.day = None
+            self.selected_left = None
+            self.selected_right = None
+            self.all_cards = {} # Diccionario local de cartas
+            self.iframe_container = None
+            self.iframe = None
+            # Placeholders para los contenedores UI
+            self.c_nat1 = self.c_nat2 = self.c_nat3 = None
+            self.c_na1 = self.c_na2 = None
+            self.c_all1 = self.c_all2 = self.c_all3 = self.c_all4 = self.c_all5 = self.c_all6 = None
 
-    categories = ["Inici", "Natural illumination", "Artificial illumination", "Natural + Artificial illumination", "All combinations"]
-    menu_panels = {}
+    state = SessionState()
 
+    # --- 2. FUNCIONES AUXILIARES (DEFINIDAS DENTRO DE MAIN PARA ACCEDER A STATE) ---
 
+    def show_selected_images():
+        def format_exr(image_name):
+            if image_name.startswith('/menu/'):
+                image_name = image_name[len('/menu/'):]
+            parts = image_name.rsplit('/', 1)
+            folder = parts[0]
+            file_name = parts[1].rsplit('.', 1)[0]
+            folder = folder.replace('+', '%2B')
+            return f"XII/{folder}/{file_name}.exr"
+
+        def format_label_text(text):
+            if isinstance(text, list):
+                return "<br>".join(str(t) for t in text)
+            return str(text)
+
+        def infer_day_from_image(image_path):
+            if not image_path: return None
+            if "D2" in image_path: return "Apr 1st"
+            elif "D3" in image_path: return "Jun 6th"
+            elif "D1" in image_path: return "Dec 25th"
+            return None
+        
+        img1 = format_exr(state.selected_left["image"]) if state.selected_left else DEFAULT_IMAGE
+        img2 = format_exr(state.selected_right["image"]) if state.selected_right else DEFAULT_IMAGE2
+
+        label1_main = format_label_text(state.selected_left["text"]) if state.selected_left else "Hanging oil lamp"
+        label2_main = format_label_text(state.selected_right["text"]) if state.selected_right else "Two table candles"
+    
+        day1 = infer_day_from_image(state.selected_left["image"]) if state.selected_left else None
+        day2 = infer_day_from_image(state.selected_right["image"]) if state.selected_right else None
+    
+        label1 = f"{day1}<br><span>{label1_main}</span>" if day1 else label1_main
+        label2 = f"{day2}<br><span>{label2_main}</span>" if day2 else label2_main
+    
+        # Añadimos un parámetro 'dummy' (&v=2) para engañar al navegador y que crea que es un archivo nuevo
+        url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}&v=2"
+    
+        html = f"""
+        <div style="position: relative; width: 100%; height: 100%;">
+            <iframe 
+                src="{url}" 
+                style="width:100%; height:100%; border:none; position: absolute; top:0; left:0; z-index:0;"
+                allowfullscreen
+                loading="lazy">
+            </iframe>
+            <div style="position: absolute; bottom: 60px; left: 25%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label1}</div>
+            <div style="position: absolute; bottom: 60px; left: 75%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label2}</div>
+        </div>
+        """
+        return html
+
+    def update_all_cards_visibility():
+        for image, buttons in state.all_cards.items():
+            for button in buttons:
+                button.set_visibility(False); button.props('flat fab')
+                if image == (state.selected_left["image"] if state.selected_left else None):
+                    button.set_visibility(True); button.props('color=white'); button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center'); button._text = "L"
+                elif image == (state.selected_right["image"] if state.selected_right else None):
+                    button.set_visibility(True); button.props('color=white'); button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center'); button._text = "R"
+
+    def create_card(image, text, classes):
+        with ui.card().tight().classes(classes) as c:
+            with ui.image(image) as img:
+                button = ui.button('', on_click=None).props('flat color=white').classes('absolute top-2 right-2 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center')
+                button.set_visibility(False)
+                button.style('width: 16px !important; height: 16px !important; min-width: 0 !important; min-height: 0 !important; border-radius: 50% !important; font-size: 8px !important; padding: 0 !important;')
+                
+                if image not in state.all_cards: state.all_cards[image] = []
+                state.all_cards[image].append(button)
+                
+                async def toggle_selection():
+                    # --- CAMBIO CLAVE: Preguntamos a JS (localStorage) qué ventana está seleccionada ---
+                    # Esto evita necesitar un endpoint global y sincroniza con el usuario actual
+                    selected_window = await ui.run_javascript('return localStorage.getItem("selectedWindow");')
+                    
+                    if not selected_window or selected_window == "none" or selected_window == "null": 
+                        ui.notify("⚠️ Select a window first (Click Left or Right view)", color='orange')
+                        return
+
+                    if selected_window == "left":
+                        state.selected_left = {"card": c, "image": image, "text": text}
+                        update_all_cards_visibility()
+                        if state.iframe_container: state.iframe_container.content = show_selected_images()
+                        return
+                    if selected_window == "right":
+                        state.selected_right = {"card": c, "image": image, "text": text}
+                        update_all_cards_visibility()
+                        if state.iframe_container: state.iframe_container.content = show_selected_images()
+                        return
+
+                img.on('click', toggle_selection)
+            with ui.card_section():
+                if isinstance(text, list):
+                    for t in text: ui.markdown(t)
+                else: ui.markdown(text)
+
+    classes_card = "h-[24vh] w-[15vh]"
+
+    # --- LÓGICA DE REFRESCO (Usa state.hour y state.day) ---
+    # --- LÓGICA DE REFRESCO ACTUALIZADA ---
+    def refresh_cards_natural():
+        if not state.c_nat1: return
+        
+        gh = state.hour
+        v_D2T1, v_D2T2, v_D2T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="10:56" or gh=="All" or not gh), (gh=="13:56" or gh=="All" or not gh)
+        v_D3T1, v_D3T2, v_D3T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="11:53" or gh=="All" or not gh), (gh=="13:53" or gh=="All" or not gh)
+        v_D1T1, v_D1T2, v_D1T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="10:53" or gh=="All" or not gh), (gh=="12:53" or gh=="All" or not gh)
+        if gh == "10:53": v_D2T1=v_D2T2=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T3=False
+        if gh == "10:56": v_D2T1=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T2=v_D1T3=False
+        
+        lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
+
+        # Grupo 1: Apr 1st
+        show_nat1 = (state.day is None or state.day == "Apr 1st" or state.day == "All") and (v_D2T1 or v_D2T2 or v_D2T3)
+        state.c_nat1.set_visibility(show_nat1) # Ocultamos si no hay nada
+        state.c_nat1.clear()
+        if show_nat1:
+            with state.c_nat1:
+                ui.label("Apr 1st").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_D2T1: create_card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes_card)
+                    if v_D2T2: create_card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes_card)
+                    if v_D2T3: create_card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes_card)
+
+        # Grupo 2: Jun 6th
+        show_nat2 = (state.day is None or state.day == "Jun 6th" or state.day == "All") and (v_D3T1 or v_D3T2 or v_D3T3)
+        state.c_nat2.set_visibility(show_nat2)
+        state.c_nat2.clear()
+        if show_nat2:
+            with state.c_nat2:
+                ui.label("Jun 6th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_D3T1: create_card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes_card)
+                    if v_D3T2: create_card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes_card)
+                    if v_D3T3: create_card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes_card)
+
+        # Grupo 3: Dec 25th
+        show_nat3 = (state.day is None or state.day == "Dec 25th" or state.day == "All") and (v_D1T1 or v_D1T2 or v_D1T3)
+        state.c_nat3.set_visibility(show_nat3)
+        state.c_nat3.clear()
+        if show_nat3:
+            with state.c_nat3:
+                ui.label("Dec 25th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_D1T1: create_card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes_card)
+                    if v_D1T2: create_card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes_card)
+                    if v_D1T3: create_card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes_card)
+        update_all_cards_visibility()
+
+    def refresh_cards_natart():
+        if not state.c_na1: return
+        
+        gh = state.hour
+        v_D1T3_C2 = v_D1T3_C5 = True; v_D2T3_C2 = v_D2T3_C5 = True
+        if gh == "12:53": v_D2T3_C2 = v_D2T3_C5 = False
+        elif gh == "13:56": v_D1T3_C2 = v_D1T3_C5 = False
+        elif gh and gh != "All" and gh not in ["12:53", "13:56"]: v_D1T3_C2 = v_D1T3_C5 = v_D2T3_C2 = v_D2T3_C5 = False
+        
+        lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
+
+        # Grupo 1
+        show_na1 = (v_D2T3_C2 or v_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
+        state.c_na1.set_visibility(show_na1)
+        state.c_na1.clear()
+        if show_na1:
+            with state.c_na1:
+                ui.label("Apr 1st").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_D2T3_C2: create_card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes_card)
+                    if v_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes_card)
+        
+        # Grupo 2
+        show_na2 = (v_D1T3_C5 or v_D1T3_C2) and (state.day is None or state.day == "Dec 25th" or state.day == "All")
+        state.c_na2.set_visibility(show_na2)
+        state.c_na2.clear()
+        if show_na2:
+            with state.c_na2:
+                ui.label("Dec 25th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_D1T3_C2: create_card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes_card)
+                    if v_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes_card)
+        update_all_cards_visibility()
+
+    def refresh_cards_all():
+        if not state.c_all1: return
+        
+        gh = state.hour
+        # ... Tus variables booleanas de hora (copia aquí toda tu lógica de horas igual que antes) ...
+        v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=True; v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=True; v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=True
+        v_na_D1T3_C2=v_na_D1T3_C5=True; v_na_D2T3_C2=v_na_D2T3_C5=True
+
+        if gh == "10:00":
+             v_nat_D2T2=v_nat_D2T3=v_nat_D3T2=v_nat_D3T3=v_nat_D1T2=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
+        elif gh == "10:53":
+             v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=v_nat_D1T1=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
+        elif gh == "10:56":
+             v_nat_D2T1=v_nat_D2T3=v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
+        elif gh == "11:53":
+             v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=v_nat_D3T1=v_nat_D3T3=v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
+        elif gh == "12:53":
+             v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=v_nat_D1T1=v_nat_D1T2=False
+             v_na_D2T3_C2=v_na_D2T3_C5=False 
+        elif gh == "13:53":
+             v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=v_nat_D3T1=v_nat_D3T2=False
+             v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
+        elif gh == "13:56":
+             v_nat_D2T1=v_nat_D2T2=False; v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=False; v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=False
+             v_na_D1T3_C2=v_na_D1T3_C5=False
+
+        lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
+        
+        # --- SECCIÓN NATURAL (En All) ---
+        show_all1 = (state.day is None or state.day == "Apr 1st" or state.day == "All") and (v_nat_D2T1 or v_nat_D2T2 or v_nat_D2T3)
+        state.c_all1.set_visibility(show_all1); state.c_all1.clear()
+        if show_all1:
+            with state.c_all1:
+                ui.label("Apr 1st").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_nat_D2T1: create_card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes_card)
+                    if v_nat_D2T2: create_card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes_card)
+                    if v_nat_D2T3: create_card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes_card)
+        
+        show_all2 = (state.day is None or state.day == "Jun 6th" or state.day == "All") and (v_nat_D3T1 or v_nat_D3T2 or v_nat_D3T3)
+        state.c_all2.set_visibility(show_all2); state.c_all2.clear()
+        if show_all2:
+            with state.c_all2:
+                ui.label("Jun 6th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_nat_D3T1: create_card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes_card)
+                    if v_nat_D3T2: create_card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes_card)
+                    if v_nat_D3T3: create_card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes_card)
+        
+        show_all3 = (state.day is None or state.day == "Dec 25th" or state.day == "All") and (v_nat_D1T1 or v_nat_D1T2 or v_nat_D1T3)
+        state.c_all3.set_visibility(show_all3); state.c_all3.clear()
+        if show_all3:
+            with state.c_all3:
+                ui.label("Dec 25th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_nat_D1T1: create_card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes_card)
+                    if v_nat_D1T2: create_card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes_card)
+                    if v_nat_D1T3: create_card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes_card)
+        
+        # --- SECCIÓN ARTIFICIAL (En All) - Siempre visible ---
+        state.c_all4.clear()
+        with state.c_all4:
+             ui.label("Spacer").style(lbl_style + "visibility: hidden;")
+             with ui.row().classes('gap-2 items-start'): 
+                create_card("/menu/Artificial/C1-pv2.jpg", [C1], classes_card)
+                create_card("/menu/Artificial/C2-pv2.jpg", [C2], classes_card)
+                create_card("/menu/Artificial/C3-pv2.jpg", [C3], classes_card)
+                create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
+                create_card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes_card)
+        
+        # --- SECCIÓN NAT+ART (En All) ---
+        show_all5 = (v_na_D2T3_C2 or v_na_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
+        state.c_all5.set_visibility(show_all5); state.c_all5.clear()
+        if show_all5:
+            with state.c_all5:
+                ui.label("Apr 1st").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_na_D2T3_C2: create_card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes_card)
+                    if v_na_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes_card)
+        
+        show_all6 = (v_na_D1T3_C5 or v_na_D1T3_C2) and (state.day is None or state.day == "Dec 25th" or state.day == "All")
+        state.c_all6.set_visibility(show_all6); state.c_all6.clear()
+        if show_all6:
+            with state.c_all6:
+                ui.label("Dec 25th").style(lbl_style)
+                with ui.row().classes('gap-2 items-start'):
+                    if v_na_D1T3_C2: create_card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes_card)
+                    if v_na_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes_card)
+        update_all_cards_visibility()
+
+    def refresh_all_views():
+        refresh_cards_natural()
+        refresh_cards_natart()
+        refresh_cards_all()
+
+    # --- HTML Y ESTILOS ---
+    
+    # Javascript helper para restaurar la ventana seleccionada en local storage (Visuales)
     ui.add_body_html("""
     <script>
-
     async function restoreSelectedWindow() {
         const container = document.getElementById('container');
         if (!container) return;
-
         let saved = localStorage.getItem('selectedWindow');
-        
-        // ✅ USAR RUTA RELATIVA (sin http://localhost...)
-        let url = '/set_selected_window';
-
         if (saved) {
             updateSelectedWindowHighlight(saved);
-            await fetch(url, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({selected: saved})
-            });
-        } else {
-            await fetch(url, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({selected: null})
-            });
         }
-
+        // Listener para clicks en el iframe
         container.addEventListener('click', async (e) => {
             const rect = container.getBoundingClientRect();
             const x = e.clientX - rect.left;
             let selectedWindow = (x < rect.width / 2) ? 'left' : 'right';
-
             localStorage.setItem('selectedWindow', selectedWindow);
             updateSelectedWindowHighlight(selectedWindow);
-
-            // ✅ USAR RUTA RELATIVA AQUÍ TAMBIÉN
-            await fetch(url, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({selected: selectedWindow})
-            });
         });
     }
-
     window.addEventListener('load', restoreSelectedWindow);
     </script>
     """)
 
 
-        
-        
+    # ... código anterior ...
+
+    # JS helper para escuchar al iframe y guardar la selección en el localStorage PRINCIPAL
+    ui.add_body_html("""
+    <script>
+    // 1. Escuchar mensajes que vienen del Iframe (puerto 3006)
+    window.addEventListener('message', function(event) {
+        // Verificamos que sea nuestro mensaje
+        if (event.data && event.data.type === 'window_selected') {
+            console.log("Recibido desde Iframe:", event.data.value);
+            
+            // 2. Guardar en el localStorage del PADRE (puerto 8080)
+            localStorage.setItem('selectedWindow', event.data.value);
+        }
+    });
+
+    // Código visual para restaurar (opcional, el que ya tenías)
+    async function restoreSelectedWindow() {
+        // ... (tu código anterior si lo necesitas) ...
+    }
+    </script>
+    """)
+    
+    # ... resto del código ...
 
     ui.add_head_html('''
     <style>
-    body, html {
-        margin: 0;
-        padding: 0;
-        overflow-x: hidden;
-    }
-
-    .menu-row {
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        background-color: white;
-    }
-                        
-
-
-
+    body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
+    .menu-row { width: 100%; margin: 0; padding: 0; background-color: white; }
     .dropdown-panel {
-        position: absolute;
-        top: 70px;
-        left: 0;
-        right: 0;
-        height: 46vh;
-        background-color: white;
-        z-index: 50;
-        display: flex;
-        flex-direction: column; 
-        align-items: stretch;
+        position: absolute; top: 100%; left: 0; right: 0; height: auto; max-height: 85vh;
+        background-color: white; z-index: 40; display: flex; flex-direction: column; align-items: stretch;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding-bottom: 25px; 
     }
-
-
-    .dropdown-panel .controls {
-        flex-shrink: 0; 
-        padding: 0 40px;
-        margin-top: 5px;
-        display: flex;
-        justify-content: flex-end;
-        gap: 1.5rem;
-        align-items: center;
+    .dropdown-panel .q-card { 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15) !important; border: 1px solid #e0e0e0;
+        display: flex; flex-direction: column; padding: 0 !important; margin: 0 !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-
-
-    .dropdown-panel .cards-wrapper {
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-        display: flex;
-        gap: 2.5rem;
-        padding: 10px;
-        flex-shrink: 0; 
-        padding-left:50px;
+    .dropdown-panel .q-card:hover {
+        transform: translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.2) !important; z-index: 10;
     }
-
-    /* Fixed size for all cards */
-    .dropdown-panel .q-card {
-        transform: scale(0.65); 
-        margin: -30px;         
-        display: flex;
-        flex-direction: column;
-        vertical-align: top;
+    .dropdown-panel .q-card .q-img { height: 60%; width: 100%; object-fit: cover; }
+    .dropdown-panel .q-card__section { 
+        height: 40%; padding: 2px 4px !important; display: flex; flex-direction: column;
+        justify-content: center; align-items: center; text-align: center; line-height: 1.15; 
     }
-            
-
-    /* First thistle with more space on the left */
-    .dropdown-panel .q-card:first-child {
-        margin-left: 20px;
+    .dropdown-panel .q-card__section p, .dropdown-panel .q-card__section div {
+        font-size: 1.25vh; color: #333; overflow: hidden;
     }
-
-    /* Set the size of the image inside the card */
-    .dropdown-panel .q-card .q-img {
-        width: 100%;       
-        height: 180px;     
-        object-fit: cover; 
-    }
-
-    /* Compact text below */
-    .dropdown-panel .q-card__section {
-        
-        font-size: 1rem;
-        line-height: 1rem;
-        text-align: center;
-        justify-content:center;
-        
-    }
-                                
-
-    .material-symbols-outlined {
-    font-variation-settings:
-    'FILL' 0,
-    'wght' 200,
-    'GRAD' 0,
-    'opsz' 24
-    }
-                        
-
-
-
-
-                        
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24 }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
-                        
-
-
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
     ''')
 
+    categories = ["Inici", "Natural illumination", "Artificial illumination", "Natural + Artificial illumination", "All combinations"]
+    menu_panels = {}
 
+    # --- WRAPPER PRINCIPAL UI ---
+    with ui.column().classes('absolute-full gap-0 no-wrap'):
 
-    ui.add_head_html('''
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
-''')
-
-
-
-    with ui.row().classes('menu-row overflow-x-auto no-scrollbar flex-nowrap').style('white-space: nowrap; justify-content: center; gap: 2rem; padding: 0 20px;'):
-        # Guardem quin panell està obert per no haver de tancar-los tots de cop (optimització Python)
-        active_panel = {'name': None}
-
-        def show_panel(e, cat):
-            # Optimització: Només tanquem el que estigui obert actualment
-            current = active_panel['name']
-            if current and current in menu_panels and current != cat:
-                menu_panels[current].set_visibility(False)
+        # --- MENU ROW ---
+        with ui.element('div').classes('w-full bg-white shadow-sm z-50 relative flex flex-col md:flex-row items-center px-2 md:px-6 py-2 md:py-0 h-auto md:h-[80px]'):
             
-            # Mostrem el nou si no és "Inici"
-            if cat != "Inici":
-                menu_panels[cat].set_visibility(True)
-                active_panel['name'] = cat
-            else:
-                active_panel['name'] = None
-
-        for cat in categories:
-            if cat == "Inici":
-                ui.icon('home', size='28px')\
-                    .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
-                    .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-            elif cat == "Natural illumination":
-                ui.icon('sunny', size='28px')\
-                    .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
-                    .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-            elif cat == "Artificial illumination":
-                ui.icon('lightbulb_2', size='28px')\
-                    .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')\
-                    .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-            elif cat == "Natural + Artificial illumination":
-                with ui.row().classes(
-                    'cursor-pointer px-2 py-2 rounded hover:bg-gray-100 transition flex-shrink-0'
-                ).style('gap: 4px;').on('mouseover', lambda e, cat=cat: show_panel(e, cat)):
-                    ui.icon('sunny', size='28px').classes('material-symbols-outlined')
-                    ui.label('+').style('font-size: 24px; font-weight: 300;')
-                    ui.icon('lightbulb_2', size='28px').classes('material-symbols-outlined')
-
-            elif cat == "All combinations":
-                ui.label('ALL')\
-                    .classes('cursor-pointer px-3 py-2 rounded hover:bg-gray-100 transition flex-shrink-0 items-center')\
-                    .style('font-size: 18px;font-weight: 300;')\
-                    .on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-
-
-
-
-    # FOLDABLE PANEL
-    # FOLDABLE PANEL
-    for cat in categories:
-        # Creamos el panel
-        with ui.column().classes('dropdown-panel') as panel:
-            panel.set_visibility(False)
-            menu_panels[cat] = panel
-
-            # 1. Lógica Python (Sincronización del estado en el servidor)
-            # Esto mantiene a Python enterado de que el panel se cerró, aunque llegue con retraso.
-            panel.on('mouseleave', lambda e, cat=cat: menu_panels[cat].set_visibility(False))
-
-          
-
-
-
-   # Function to refresh Natural illumination cards 
-    def refresh_cards_natural():
-        
-       #  We delete old content
-        cards_container_natural1.clear()
-        cards_container_natural2.clear()
-        cards_container_natural3.clear()
-
-       #  Update visibility based on time
-        if natural_hour == "10:00":
-            visible_D2T1_natural = True
-            visible_D2T2_natural = False
-            visible_D2T3_natural = False
-            visible_D3T1_natural = True
-            visible_D3T2_natural = False
-            visible_D3T3_natural = False
-            visible_D1T1_natural = True
-            visible_D1T2_natural = False
-            visible_D1T3_natural = False
-        elif natural_hour == "10:53":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = False
-            visible_D2T3_natural = False
-            visible_D3T1_natural = False
-            visible_D3T2_natural = False
-            visible_D3T3_natural = False
-            visible_D1T1_natural = False
-            visible_D1T2_natural = True
-            visible_D1T3_natural = False
-        elif natural_hour == "10:56":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = True
-            visible_D2T3_natural = False
-            visible_D3T1_natural = False
-            visible_D3T2_natural = False
-            visible_D3T3_natural = False
-            visible_D1T1_natural = False
-            visible_D1T2_natural = False
-            visible_D1T3_natural = False
-        elif natural_hour == "11:53":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = False
-            visible_D2T3_natural = False
-            visible_D3T1_natural = False
-            visible_D3T2_natural = True
-            visible_D3T3_natural = False
-            visible_D1T1_natural = False
-            visible_D1T2_natural = False
-            visible_D1T3_natural = False
-        elif natural_hour == "12:53":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = False
-            visible_D2T3_natural = False
-            visible_D3T1_natural = False
-            visible_D3T2_natural = False
-            visible_D3T3_natural = False
-            visible_D1T1_natural = False
-            visible_D1T2_natural = False
-            visible_D1T3_natural = True
-        elif natural_hour == "13:53":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = False
-            visible_D2T3_natural = False
-            visible_D3T1_natural = False
-            visible_D3T2_natural = False
-            visible_D3T3_natural = True
-            visible_D1T1_natural = False
-            visible_D1T2_natural = False
-            visible_D1T3_natural = False
-        elif natural_hour == "13:56":
-            visible_D2T1_natural = False
-            visible_D2T2_natural = False
-            visible_D2T3_natural = True
-            visible_D3T1_natural = False
-            visible_D3T2_natural = False
-            visible_D3T3_natural = False
-            visible_D1T1_natural = False
-            visible_D1T2_natural = False
-            visible_D1T3_natural = False
-        else:
-            visible_D2T1_natural = True
-            visible_D2T2_natural = True
-            visible_D2T3_natural = True
-            visible_D3T1_natural = True
-            visible_D3T2_natural = True
-            visible_D3T3_natural = True
-            visible_D1T1_natural = True
-            visible_D1T2_natural = True
-            visible_D1T3_natural = True
-
-
-       # First column: Apr 1st
-        if (visible_D2T1_natural or visible_D2T2_natural or visible_D2T3_natural) and \
-        (natural_day is None or natural_day == "Apr 1st" or natural_day == "All"):
-            with cards_container_natural1:
-                ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
-                    if visible_D2T1_natural:
-                        card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes)
-                    if visible_D2T2_natural:
-                        card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes)
-                    if visible_D2T3_natural:
-                        card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes)
-
-
-        # Second column: Jun 6th 
-        if (visible_D3T1_natural or visible_D3T2_natural or visible_D3T3_natural) and \
-        (natural_day is None or natural_day == "Jun 6th" or natural_day == "All"):
-            with cards_container_natural2:
-                ui.label("Jun 6th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
-                    if visible_D3T1_natural:
-                        card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes)
-                    if visible_D3T2_natural:
-                        card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes)
-                    if visible_D3T3_natural:
-                        card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes)
-
-       # Third column: Dec 25th 
-        if (visible_D1T1_natural or visible_D1T2_natural or visible_D1T3_natural)and \
-        (natural_day is None or natural_day == "Dec 25th" or natural_day == "All"):
-            with cards_container_natural3:
-                ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
-                    if visible_D1T1_natural:
-                        card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes)
-                    if visible_D1T2_natural:
-                        card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes)
-                    if visible_D1T3_natural:
-                        card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes)
-
-    
-        update_all_cards_visibility()
-
-
-
-    def refresh_cards_natart():
-        
-       #  We delete old content
-        cards_container_natart1.clear()
-        cards_container_natart2.clear()
-       
-
-       #  Update visibility based on time
-       
-        if natart_hour == "12:53":
-            visible_D1T3_C2_natart=True
-            visible_D1T3_C5_natart=True
-            visible_D2T3_C2_natart=False
-            visible_D2T3_C5_natart=False
-        elif natart_hour == "13:56":
-            visible_D1T3_C2_natart=False
-            visible_D1T3_C5_natart=False
-            visible_D2T3_C2_natart=True
-            visible_D2T3_C5_natart=True
-        else:
-            visible_D1T3_C2_natart=True
-            visible_D1T3_C5_natart=True
-            visible_D2T3_C2_natart=True
-            visible_D2T3_C5_natart=True
-            
-
-
-       # First column: Apr 1st
-        if (visible_D2T3_C2_natart or visible_D2T3_C5_natart) and \
-        (natart_day is None or natart_day == "Apr 1st" or natart_day == "All"):
-            with cards_container_natart1:
-                ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
-                    if visible_D2T3_C2_natart:
-                        card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes)
-                    if visible_D2T3_C5_natart:
-                        card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes)
-
-
-        # Second column: Dec 25th 
-        if (visible_D1T3_C5_natart or visible_D1T3_C2_natart) and \
-        (natart_day is None or natart_day == "Dec 25th" or natart_day == "All"):
-            with cards_container_natart2:
-                ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px; transform-origin: top left;'):
-                    if visible_D1T3_C2_natart:
-                        card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes)
-                    if visible_D1T3_C5_natart:
-                        card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes)
-
-    
-        update_all_cards_visibility()
-
-
-    def refresh_cards_all():
-        
-       #  We delete old content
-        cards_container_all1.clear()
-        cards_container_all2.clear()
-        cards_container_all3.clear()
-        cards_container_all4.clear()
-        cards_container_all5.clear()
-        cards_container_all6.clear()
-       
-
-       #  Update visibility based on time
-       
-        if all_hour == "10:00":
-            visible_D2T1_all = True
-            visible_D2T2_all = False
-            visible_D2T3_all = False
-            visible_D3T1_all = True
-            visible_D3T2_all = False
-            visible_D3T3_all = False
-            visible_D1T1_all = True
-            visible_D1T2_all = False
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "10:53":
-            visible_D2T1_all = False
-            visible_D2T2_all = False
-            visible_D2T3_all = False
-            visible_D3T1_all = False
-            visible_D3T2_all = False
-            visible_D3T3_all = False
-            visible_D1T1_all = False
-            visible_D1T2_all = True
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "10:56":
-            visible_D2T1_all = False
-            visible_D2T2_all = True
-            visible_D2T3_all = False
-            visible_D3T1_all = False
-            visible_D3T2_all = False
-            visible_D3T3_all = False
-            visible_D1T1_all = False
-            visible_D1T2_all = False
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "11:53":
-            visible_D2T1_all = False
-            visible_D2T2_all = False
-            visible_D2T3_all = False
-            visible_D3T1_all = False
-            visible_D3T2_all = True
-            visible_D3T3_all = False
-            visible_D1T1_all = False
-            visible_D1T2_all = False
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "12:53":
-            visible_D2T1_all = False
-            visible_D2T2_all = False
-            visible_D2T3_all = False
-            visible_D3T1_all = False
-            visible_D3T2_all = False
-            visible_D3T3_all = False
-            visible_D1T1_all = False
-            visible_D1T2_all = False
-            visible_D1T3_all = True
-            visible_D1T3_C2_all=True
-            visible_D1T3_C5_all=True
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "13:53":
-            visible_D2T1_all = False
-            visible_D2T2_all = False
-            visible_D2T3_all = False
-            visible_D3T1_all = False
-            visible_D3T2_all = False
-            visible_D3T3_all = True
-            visible_D1T1_all = False
-            visible_D1T2_all = False
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=False
-            visible_D2T3_C5_all=False
-        elif all_hour == "13:56":
-            visible_D2T1_all = False
-            visible_D2T2_all = False
-            visible_D2T3_all= True
-            visible_D3T1_all = False
-            visible_D3T2_all = False
-            visible_D3T3_all= False
-            visible_D1T1_all = False
-            visible_D1T2_all = False
-            visible_D1T3_all = False
-            visible_D1T3_C2_all=False
-            visible_D1T3_C5_all=False
-            visible_D2T3_C2_all=True
-            visible_D2T3_C5_all=True
-        else:
-            visible_D2T1_all= True
-            visible_D2T2_all = True
-            visible_D2T3_all = True
-            visible_D3T1_all = True
-            visible_D3T2_all = True
-            visible_D3T3_all = True
-            visible_D1T1_all = True
-            visible_D1T2_all = True
-            visible_D1T3_all = True
-            visible_D1T3_C2_all=True
-            visible_D1T3_C5_all=True
-            visible_D2T3_C2_all=True
-            visible_D2T3_C5_all=True
-            
-
-        #Natural
-
-       # First column: Apr 1st
-        if (visible_D2T1_all or visible_D2T2_all or visible_D2T3_all) and \
-        (all_day is None or all_day == "Apr 1st" or all_day == "All"):
-            with cards_container_all1:
-                ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                    if visible_D2T1_all:
-                        card("/menu/Natural/D2T1-pv2.jpg", [D2T1], classes)
-                    if visible_D2T2_all:
-                        card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes)
-                    if visible_D2T3_all:
-                        card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes)
-
-
-        # Second column: Jun 6th 
-        if (visible_D3T1_all or visible_D3T2_all or visible_D3T3_all) and \
-        (all_day is None or all_day == "Jun 6th" or all_day == "All"):
-            with cards_container_all2:
-                ui.label("Jun 6th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                    if visible_D3T1_all:
-                        card("/menu/Natural/D3T1-pv2.jpg", [D3T1], classes)
-                    if visible_D3T2_all:
-                        card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes)
-                    if visible_D3T3_all:
-                        card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes)
-
-        # Third column: Dec 25th 
-        if (visible_D1T1_all or visible_D1T2_all or visible_D1T3_all)and \
-        (all_day is None or all_day == "Dec 25th" or all_day == "All"):
-            with cards_container_all3:
-                ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                    if visible_D1T1_all:
-                        card("/menu/Natural/D1T1-pv2.jpg", [D1T1], classes)
-                    if visible_D1T2_all:
-                        card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes)
-                    if visible_D1T3_all:
-                        card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes)
-
-        #Artificial
-
-        with cards_container_all4:
-                with ui.row().classes('gap-2 items-start').style('margin-top: 18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                   
-                    card("/menu/Artificial/C1-pv2.jpg", [C1], classes)
-                    card("/menu/Artificial/C2-pv2.jpg", [C2], classes)
-                    card("/menu/Artificial/C3-pv2.jpg", [C3], classes)
-                    card("/menu/Artificial/C4-pv2.jpg", [C4], classes)
-                    card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes)
-        
-
-        #Nat+Art
-
-        # First column: Apr 1st
-        if (visible_D2T3_C2_all or visible_D2T3_C5_all) and \
-        (all_day is None or all_day == "Apr 1st" or all_day == "All"):
-            with cards_container_all5:
-                ui.label("Apr 1st").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                    if visible_D2T3_C2_all:
-                        card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes)
-                    if visible_D2T3_C5_all:
-                        card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes)
-
-        # Second column: Dec 25st
-        if (visible_D1T3_C5_all or visible_D1T3_C2_all) and \
-        (all_day is None or all_day == "Dec 25th" or all_day == "All"):
-            with cards_container_all6:
-                ui.label("Dec 25th").classes('text-sm').style('margin-bottom: 5px; line-height: 1;')
-                with ui.row().classes('gap-2 items-start').style('margin-top: -18px; margin-left: -45px;transform: scale(0.9); transform-origin: top left;'):
-                    if visible_D1T3_C2_all:
-                        card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes)
-                    if visible_D1T3_C5_all:
-                        card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes)
-
-    
-        update_all_cards_visibility()
-
-        
-
-            
-
-
-
-   
-    # Natural illumination
-    with menu_panels["Natural illumination"]:
-        classes = "w-[180px] h-[320px]"
-
-        # main container
-        with ui.row().classes('w-full justify-end items-center gap-6').style('padding: 0px 40px 0 40px;margin-top:5px'):
-            # Relative container for the "Time" menu
-            with ui.element('div').classes('relative'):
-
-                icon_hour= ui.icon('access_time', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_hour = ui.label("Hour").classes(
-                    'text-sm text-gray-500 cursor-pointer hover:text-black select-none'
-                )
-
-                # Time selection menu
-                with ui.menu().props(
-                    'auto-close="false" anchor="bottom middle" self="top middle"'
-                ).classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as hour_menu:
-                    ui.label("Select hour").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-
-                    def set_hour(hour):
-                        global natural_hour
-                        natural_hour = hour
-
-
-                        ui.run_javascript(f'localStorage.setItem("natural_hour", "{hour}")')
-
-                        if hour == "All":
-                            icon_hour.set_visibility(True)
-                            label_hour.set_text("")
-                        else:
-                            label_hour.set_text(hour)
-                            icon_hour.set_visibility(False)
-                        refresh_cards_natural()
-
-                    ui.menu_item("All", lambda: set_hour("All"))
-                    ui.menu_item("10:00 am", lambda: set_hour("10:00"))
-                    ui.menu_item("10:53 am", lambda: set_hour("10:53"))
-                    ui.menu_item("10:56 am", lambda: set_hour("10:56"))
-                    ui.menu_item("11:53 am", lambda: set_hour("11:53"))
-                    ui.menu_item("12:53 pm", lambda: set_hour("12:53"))
-                    ui.menu_item("13:53 pm", lambda: set_hour("13:53"))
-                    ui.menu_item("13:56 pm", lambda: set_hour("13:56"))
-
-                label_hour.on('click', hour_menu.toggle)
-                icon_hour.on('click', hour_menu.toggle)
-
-
-                async def restore_hour_from_localstorage():
-                    saved_hour = await ui.run_javascript('localStorage.getItem("natural_hour")')
-                    if not saved_hour or saved_hour == "All":
-                        icon_hour.set_visibility(True)
-                        label_hour.set_text("")
-                    else:
-                        icon_hour.set_visibility(False)
-                        label_hour.set_text(saved_hour)
-                        global natural_hour
-                        natural_hour = saved_hour
-                        refresh_cards_natural()
-
-                ui.timer(0.1, restore_hour_from_localstorage, once=True)
-
-            
-
-
-           # Relative container for the "Day" menu
-            with ui.element('div').classes('relative'):
-
-                icon_day= ui.icon('calendar_today', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_day = ui.label("Day").classes(
-                    'text-sm text-gray-500 cursor-pointer hover:text-black select-none'
-                )
-
-               # Day selection menu
-                with ui.menu().props(
-                    'auto-close="false" anchor="bottom middle" self="top middle"'
-                ).classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as day_menu:
-                    ui.label("Select day ").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-
-                    def set_day(day):
-                        global natural_day
-                        natural_day = day
-                        ui.run_javascript(f'localStorage.setItem("natural_day", "{day}")')
-                        if day == "All":
-                            label_day.set_text("")
-                            icon_day.set_visibility(True)
-                        else:
-                            label_day.set_text(day)
-                            icon_day.set_visibility(False)
-                        refresh_cards_natural()
-
-                    ui.menu_item("All", lambda: set_day("All"))
-                    ui.menu_item("Apr 1st", lambda: set_day("Apr 1st"))
-                    ui.menu_item("Jun 6th", lambda: set_day("Jun 6th"))
-                    ui.menu_item("Dec 25th", lambda: set_day("Dec 25th"))
-                    
-
-                label_day.on('click', day_menu.toggle)
-                icon_day.on('click', day_menu.toggle)
-
-
-                async def restore_day_from_localstorage():
-                    saved_day = await ui.run_javascript('localStorage.getItem("natural_day")')
-                    if not saved_day or saved_day == "All":
-                        icon_day.set_visibility(True)
-                        label_day.set_text("")
-                    else:
-                        icon_day.set_visibility(False)
-                        label_day.set_text(saved_day)
-                        global natural_day
-                        natural_day = saved_day
-                        refresh_cards_natural()
-
-                ui.timer(0.1, restore_day_from_localstorage, once=True)
-
-          # view label 
-            ui.icon('visibility', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-        
-
-        
-
-        #Content with horizontal scroll
-        with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 40px; white-space: nowrap; padding-top: 15px;'):
-            with ui.row().classes('justify-start gap-1 items-start flex-nowrap').style('display: inline-flex;'):
-
-                # First column: Apr 1st
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 0px;') as cards_container_natural1:
-                    pass
-
-                # Second column: Jun 6th
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 20px;') as cards_container_natural2:
-                    pass
-
-                #Third column: Dec 25th
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 20px;') as cards_container_natural3:
-                    pass
-
-        
-        refresh_cards_natural()
-
-
-    # Artificial illumination
-    with menu_panels["Artificial illumination"]:
-        classes = "w-[180px] h-[320px]"
-
-        with ui.row().classes('w-full justify-end items-center gap-6').style('padding: 0px 40px 0 40px; margin-top:5px'):
-            ui.icon('visibility', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-
-        with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 50px; white-space: nowrap; padding-top: 0px;'):
-            with ui.row().classes('justify-start gap-8 items-start flex-nowrap').style('display: inline-flex;'):
+            ui.element('div').classes('hidden md:block') # Spacer Left
+
+            # 2. Categorías (Centro)
+            active_panel = {'name': None}
+            def show_panel(e, cat):
+                current = active_panel['name']
+                if current and current in menu_panels and current != cat:
+                    menu_panels[current].set_visibility(False)
+                if cat != "Inici":
+                    if cat in menu_panels:
+                        menu_panels[cat].set_visibility(True)
+                        active_panel['name'] = cat
+                else:
+                    if current and current in menu_panels: menu_panels[current].set_visibility(False)
+                    active_panel['name'] = None
+
+            with ui.row().classes('w-full md:w-auto flex justify-center gap-8 md:absolute md:left-1/2 md:transform md:-translate-x-1/2 flex-wrap md:flex-nowrap'):
+                for cat in categories:
+                    # (Tu lógica de iconos se mantiene igual)
+                    if cat == "Inici": ui.icon('home', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    elif cat == "Natural illumination": ui.icon('sunny', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    elif cat == "Artificial illumination": ui.icon('lightbulb_2', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    elif cat == "Natural + Artificial illumination":
+                        with ui.row().classes('cursor-pointer hover:bg-gray-100 p-1 rounded transition items-center gap-1').on('mouseover', lambda e, cat=cat: show_panel(e, cat)):
+                            ui.icon('sunny', size='28px').classes('material-symbols-outlined text-gray-700')
+                            ui.label('+').style('font-size: 20px; font-weight: 300;')
+                            ui.icon('lightbulb_2', size='28px').classes('material-symbols-outlined text-gray-700')
+                    elif cat == "All combinations":
+                        ui.label('ALL').classes('cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition text-gray-700 font-light text-lg').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+
+            # 3. Filtros (Derecha)
+            with ui.row().classes('w-full md:w-auto flex justify-center md:justify-end gap-6 md:ml-auto items-center flex-nowrap mt-2 md:mt-0'):
                 
+                # HOUR
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    def toggle_hour_menu(): hour_menu.toggle()
+                    icon_hour = ui.icon('access_time', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_hour_menu)
+                    label_hour = ui.label("").classes('text-sm text-black cursor-pointer hover:text-black whitespace-nowrap').on('click', toggle_hour_menu); label_hour.set_visibility(False)
+                    with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as hour_menu:
+                        ui.label("Global Hour").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
+                        def set_global_hour_fn(h):
+                            state.hour = h; ui.run_javascript(f'localStorage.setItem("global_hour", "{h}")')
+                            if h == "All": icon_hour.set_visibility(True); label_hour.set_visibility(False)
+                            else: icon_hour.set_visibility(False); label_hour.set_text(h); label_hour.set_visibility(True)
+                            refresh_all_views()
+                        ui.menu_item("All", lambda: set_global_hour_fn("All")); ui.menu_item("10:00 am", lambda: set_global_hour_fn("10:00"))
+                        ui.menu_item("10:53 am", lambda: set_global_hour_fn("10:53")); ui.menu_item("10:56 am", lambda: set_global_hour_fn("10:56"))
+                        ui.menu_item("11:53 am", lambda: set_global_hour_fn("11:53")); ui.menu_item("12:53 pm", lambda: set_global_hour_fn("12:53"))
+                        ui.menu_item("13:53 pm", lambda: set_global_hour_fn("13:53")); ui.menu_item("13:56 pm", lambda: set_global_hour_fn("13:56"))
+
+                # DAY
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    def toggle_day_menu(): day_menu.toggle()
+                    icon_day = ui.icon('calendar_today', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_day_menu)
+                    label_day = ui.label("").classes('text-sm text-black cursor-pointer hover:text-black whitespace-nowrap').on('click', toggle_day_menu); label_day.set_visibility(False)
+                    with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as day_menu:
+                        ui.label("Global Day").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
+                        def set_global_day_fn(d):
+                            state.day = d; ui.run_javascript(f'localStorage.setItem("global_day", "{d}")')
+                            if d == "All": icon_day.set_visibility(True); label_day.set_visibility(False)
+                            else: icon_day.set_visibility(False); label_day.set_text(d); label_day.set_visibility(True)
+                            refresh_all_views()
+                        ui.menu_item("All", lambda: set_global_day_fn("All")); ui.menu_item("Apr 1st", lambda: set_global_day_fn("Apr 1st"))
+                        ui.menu_item("Jun 6th", lambda: set_global_day_fn("Jun 6th")); ui.menu_item("Dec 25th", lambda: set_global_day_fn("Dec 25th"))
+
+                # VISIBILITY
+                # VISIBILITY
+                # CORRECCIÓN: Usamos 'with' para meter el icono DENTRO del div, igual que los otros.
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    ui.icon('visibility', size="22px") \
+                        .classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined') \
+                       
+
+                async def restore_globals():
+                    # Recuperar estado del navegador para este usuario
+                    g_hour = await ui.run_javascript('return localStorage.getItem("global_hour")')
+                    g_day = await ui.run_javascript('return localStorage.getItem("global_day")')
+                    
+                    if g_hour and g_hour != "All" and g_hour != "null": 
+                        state.hour = g_hour; icon_hour.set_visibility(False); label_hour.set_text(g_hour); label_hour.set_visibility(True)
+                    else: 
+                        icon_hour.set_visibility(True); label_hour.set_visibility(False)
+                    
+                    if g_day and g_day != "All" and g_day != "null": 
+                        state.day = g_day; icon_day.set_visibility(False); label_day.set_text(g_day); label_day.set_visibility(True)
+                    else: 
+                        icon_day.set_visibility(True); label_day.set_visibility(False)
+                    
+                    refresh_all_views()
                 
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 0px;'):
+                ui.timer(0.1, restore_globals, once=True)
+
+            # --- PANELES DESPLEGABLES ---
+            # --- PANELES DESPLEGABLES ---
+            def hide_panel(panel_key):
+                if panel_key in menu_panels: menu_panels[panel_key].set_visibility(False)
+                if active_panel['name'] == panel_key: active_panel['name'] = None
+
+            # 1. NATURAL ILLUMINATION
+            with ui.column().classes('dropdown-panel') as panel:
+                panel.set_visibility(False); menu_panels["Natural illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural illumination"))
+                # CAMBIO: Añadido gap-[3vh] y quitados los margin-left de las columnas
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                    with ui.row().classes('justify-start gap-[3vh] items-start flex-nowrap').style('display: inline-flex;'):
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat1: pass
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat2: pass
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat3: pass
+
+            # 2. ARTIFICIAL ILLUMINATION
+            with ui.column().classes('dropdown-panel') as panel:
+                panel.set_visibility(False); menu_panels["Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Artificial illumination"))
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                    with ui.row().classes('justify-start gap-2 items-start flex-nowrap').style('display: inline-flex;'):
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 0px;'):
+                            with ui.row().classes('gap-2 items-start'):
+                                create_card("/menu/Artificial/C1-pv2.jpg", [C1], classes_card); create_card("/menu/Artificial/C2-pv2.jpg", [C2], classes_card)
+                                create_card("/menu/Artificial/C3-pv2.jpg", [C3], classes_card); create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
+                                create_card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes_card)
+
+            # 3. NATURAL + ARTIFICIAL
+            with ui.column().classes('dropdown-panel') as panel:
+                panel.set_visibility(False); menu_panels["Natural + Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural + Artificial illumination"))
+                # CAMBIO: Añadido gap-[3vh] y quitados los margin-left
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                    with ui.row().classes('justify-start gap-[3vh] items-start flex-nowrap').style('display: inline-flex;'):
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na1: pass
+                        with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na2: pass
+
+            # 4. ALL COMBINATIONS
+            with ui.column().classes('dropdown-panel') as panel:
+                panel.set_visibility(False); menu_panels["All combinations"] = panel; panel.on('mouseleave', lambda: hide_panel("All combinations"))
+                # CAMBIO: Ajuste de gaps y quitados los margin-left internos
+                with ui.row().classes('cards-wrapper w-full overflow-x-auto overflow-y-hidden no-scrollbar flex-nowrap pl-10 pr-10 items-start').style('white-space: nowrap; margin-top: 3vh; padding-bottom: 3vh; gap: 6vh;'):
                     
-                    with ui.row().classes('gap-2 items-start').style('margin-top: 20px; margin-left: -55px;'):
-
-                        card("/menu/Artificial/C1-pv2.jpg", [C1], classes)
-                        card("/menu/Artificial/C2-pv2.jpg", [C2], classes)
-                        card("/menu/Artificial/C3-pv2.jpg", [C3], classes)
-                        card("/menu/Artificial/C4-pv2.jpg", [C4], classes)
-                        card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes)
-
-
-
-
-    # Natural + Artificial illumination
-
-    with menu_panels["Natural + Artificial illumination"]:
-        classes = "w-[180px] h-[320px]"
-
-        # main container
-        with ui.row().classes('w-full justify-end items-center gap-6').style('padding: 0px 40px 0 40px; margin-top:5px'):
-            # Relative container for the "Time" menu
-            with ui.element('div').classes('relative'):
-                icon_hour3= ui.icon('access_time', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_hour3 = ui.label("Hour").classes(
-                    'text-sm text-gray-500 cursor-pointer hover:text-black select-none'
-                )
-
-                # Time selection menu
-                with ui.menu().props(
-                    'auto-close="false" anchor="bottom middle" self="top middle"'
-                ).classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as hour_menu3:
-                    ui.label("Select hour").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-
-                    def set_hour3(hour3):
-                        global natart_hour
-                        natart_hour = hour3
-
-                        ui.run_javascript(f'localStorage.setItem("natart_hour", "{hour3}")')
-
-                        if hour3 == "All":
-                            icon_hour3.set_visibility(True)
-                            label_hour3.set_text("")
-                        else:
-                            label_hour3.set_text(hour3)
-                            icon_hour3.set_visibility(False)
-                        refresh_cards_natart()
-
-                    ui.menu_item("All", lambda: set_hour3("All"))
-                    ui.menu_item("12:53 pm", lambda: set_hour3("12:53"))
-                    ui.menu_item("13:56 pm", lambda: set_hour3("13:56"))
-
-                label_hour3.on('click', hour_menu3.toggle)
-                icon_hour3.on('click', hour_menu3.toggle)
-
-
-                async def restore_hour3_from_localstorage():
-                    saved_hour3 = await ui.run_javascript('localStorage.getItem("natart_hour")')
-                    if not saved_hour3 or saved_hour3 == "All":
-                        icon_hour3.set_visibility(True)
-                        label_hour3.set_text("")
-                    else:
-                        icon_hour3.set_visibility(False)
-                        label_hour3.set_text(saved_hour3)
-                        global natart_hour
-                        natart_hour = saved_hour3
-                        refresh_cards_natural()
-
-                ui.timer(0.1, restore_hour3_from_localstorage, once=True)
-
-
-
-           # Relative container for the "Day" menu
-            with ui.element('div').classes('relative'):
-                icon_day3= ui.icon('calendar_today', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_day3 = ui.label("Day").classes(
-                    'text-sm text-gray-500 cursor-pointer hover:text-black select-none'
-                )
-
-               # Day selection menu
-                with ui.menu().props(
-                    'auto-close="false" anchor="bottom middle" self="top middle"'
-                ).classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as day_menu3:
-                    ui.label("Select day").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-
-                    def set_day3(day3):
-                        global natart_day
-                        natart_day = day3
-
-                        ui.run_javascript(f'localStorage.setItem("natart_day", "{day3}")')
-
-                        if day3 == "All":
-                            label_day3.set_text("")
-                            icon_day3.set_visibility(True)
-                        else:
-                            label_day3.set_text(day3)
-                            icon_day3.set_visibility(False)
-                        refresh_cards_natart()
-
-                    ui.menu_item("All", lambda: set_day3("All"))
-                    ui.menu_item("Apr 1st", lambda: set_day3("Apr 1st"))
-                    ui.menu_item("Dec 25th", lambda: set_day3("Dec 25th"))
+                    # Columna Grupo Natural
+                    with ui.column().classes('items-start w-auto flex-shrink-0'):
+                        ui.label("Natural illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
+                        with ui.row().classes('items-start gap-[2vh]'): # Gap aquí
+                            with ui.column().classes('flex-shrink-0') as state.c_all1: pass
+                            with ui.column().classes('flex-shrink-0') as state.c_all2: pass
+                            with ui.column().classes('flex-shrink-0') as state.c_all3: pass
                     
-
-                label_day3.on('click', day_menu3.toggle)
-                icon_day3.on('click', day_menu3.toggle)
-
-                async def restore_day3_from_localstorage():
-                    saved_day3 = await ui.run_javascript('localStorage.getItem("natart_day")')
-                    if not saved_day3 or saved_day3 == "All":
-                        icon_day3.set_visibility(True)
-                        label_day3.set_text("")
-                    else:
-                        icon_day3.set_visibility(False)
-                        label_day3.set_text(saved_day3)
-                        global natart_day
-                        natart_day = saved_day3
-                        refresh_cards_natart()
-
-                ui.timer(0.1, restore_day3_from_localstorage, once=True)
-
-          # view label 
-            ui.icon('visibility', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-
-        #Content with horizontal scroll
-        with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 40px; white-space: nowrap; padding-top: 15px;'):
-            with ui.row().classes('justify-start gap-1 items-start flex-nowrap').style('display: inline-flex;'):
-
-                # First column: Apr 1st
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 0px;') as cards_container_natart1:
-                    pass
-
-                # Second column: Dec 25th
-                with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 20px;') as cards_container_natart2:
-                    pass
-
-        
-        refresh_cards_natart()
-  
-
-
-    
-    #All Combinations
-
-
-    with menu_panels["All combinations"]:
-        classes = "w-[180px] h-[320px]"
-
-        with ui.row().classes(' controls w-full justify-end items-center gap-6').style('padding: 0px 40px; margin-top:5px'):
-            # Hour menu
-            with ui.element('div').classes('relative'):
-
-                icon_hour4= ui.icon('access_time', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_hour4 = ui.label("Hour").classes('text-sm text-gray-500 cursor-pointer hover:text-black select-none')
-                with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"') \
-                        .classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as hour_menu4:
-                    ui.label("Select hour").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-                    def set_hour4(hour4):
-                        global all_hour
-                        all_hour = hour4
-
-                        ui.run_javascript(f'localStorage.setItem("all_hour", "{hour4}")')
-                        
-                        if hour4 =="All":
-                            icon_hour4.set_visibility(True)
-                            label_hour4.set_text("")
-                        else:
-                            label_hour4.set_text(hour4)
-                            icon_hour4.set_visibility(False)
-
-
-                        refresh_cards_all()
-                    ui.menu_item("All", lambda: set_hour4("All"))
-                    ui.menu_item("10:00 am", lambda: set_hour4("10:00"))
-                    ui.menu_item("10:53 am", lambda: set_hour4("10:53"))
-                    ui.menu_item("10:56 am", lambda: set_hour4("10:56"))
-                    ui.menu_item("11:53 am", lambda: set_hour4("11:53"))
-                    ui.menu_item("12:53 pm", lambda: set_hour4("12:53"))
-                    ui.menu_item("13:53 pm", lambda: set_hour4("13:53"))
-                    ui.menu_item("13:56 pm", lambda: set_hour4("13:56"))
-
-
-                label_hour4.on('click', hour_menu4.toggle)
-                icon_hour4.on('click', hour_menu4.toggle)
-
-                async def restore_hour4_from_localstorage():
-                    saved_hour4 = await ui.run_javascript('localStorage.getItem("all_hour")')
-                    if not saved_hour4 or saved_hour4 == "All":
-                        icon_hour4.set_visibility(True)
-                        label_hour4.set_text("")
-                    else:
-                        icon_hour4.set_visibility(False)
-                        label_hour4.set_text(saved_hour4)
-                        global all_hour
-                        all_hour = saved_hour4
-                        refresh_cards_all()
-
-                ui.timer(0.1, restore_hour4_from_localstorage, once=True)
-            # Day menu
-            with ui.element('div').classes('relative'):
-
-                icon_day4= ui.icon('calendar_today', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-                label_day4 = ui.label("Day").classes('text-sm text-gray-500 cursor-pointer hover:text-black select-none')
-                with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"') \
-                        .classes('bg-white shadow-md rounded-md p-2 z-50 w-40') as day_menu4:
-                    ui.label("Select day").classes('text-sm text-gray-600 px-2 py-1')
-                    ui.separator()
-                    def set_day4(day4):
-                        global all_day
-                        all_day = day4
-
-                        ui.run_javascript(f'localStorage.setItem("all_day", "{day4}")')
-
-                        if day4 =="All":
-                            icon_day4.set_visibility(True)
-                            label_day4.set_text("")
-                        else:
-                            label_day4.set_text(day4)
-                            icon_day4.set_visibility(False)
-                        refresh_cards_all()
-                    ui.menu_item("All", lambda: set_day4("All"))
-                    ui.menu_item("Apr 1st", lambda: set_day4("Apr 1st"))
-                    ui.menu_item("Jun 6th", lambda: set_day4("Jun 6th"))
-                    ui.menu_item("Dec 25th", lambda: set_day4("Dec 25th"))
-                label_day4.on('click', day_menu4.toggle)
-                icon_day4.on('click', day_menu4.toggle)
-
-
-                async def restore_day4_from_localstorage():
-                    saved_day4 = await ui.run_javascript('localStorage.getItem("all_day")')
-                    if not saved_day4 or saved_day4 == "All":
-                        icon_day4.set_visibility(True)
-                        label_day4.set_text("")
-                    else:
-                        icon_day4.set_visibility(False)
-                        label_day4.set_text(saved_day4)
-                        global all_day
-                        all_day = saved_day4
-                        refresh_cards_all()
-
-                ui.timer(0.1, restore_day4_from_localstorage, once=True)
-
-            # View label
-            ui.icon('visibility', size="20px").classes('cursor-pointer rounded hover:bg-gray-100 transition flex-shrink-0 material-symbols-outlined')
-
-        # --- Scrollable Cards Row ---
-        with ui.row().classes(
-            'cards-wrapper w-full overflow-x-auto no-scrollbar flex-nowrap gap-10 pl-10 pr-10 items-start'
-        ).style('white-space: nowrap;'):
-            
-            # Natural
-            with ui.column().classes('items-start w-auto flex-shrink-0'):
-                ui.label("Natural illumination").classes('text-black text-sm font-semibold mb-2')
-                with ui.row().classes('gap-1 items-start'):
-                    with ui.column().classes('flex-shrink-0') as cards_container_all1: pass
-                    with ui.column().classes('flex-shrink-0') as cards_container_all2: pass
-                    with ui.column().classes('flex-shrink-0') as cards_container_all3: pass
-
-            # Artificial
-            with ui.column().classes('items-start w-auto flex-shrink-0'):
-                ui.label("Artificial illumination").classes('text-black text-sm font-semibold mb-2')
-                with ui.row().classes('gap-1 items-start'):
-                    with ui.column().classes('flex-shrink-0') as cards_container_all4: pass
-
-            # Natural + Artificial
-            with ui.column().classes('items-start w-auto flex-shrink-0 -ml-6'):
-                ui.label("Natural+Artificial illumination").classes('text-black text-sm font-semibold mb-2')
-                with ui.row().classes('gap-1 items-start'):
-                    with ui.column().classes('flex-shrink-0') as cards_container_all5: pass
-                    with ui.column().classes('flex-shrink-0') as cards_container_all6: pass
-
-            refresh_cards_all()     
-
-
-    # Main viewer occupying all the rest of the screen
-    iframe_container = ui.html(show_selected_images(), sanitize=False)\
-    .classes('w-screen')\
-    .style('height: calc(100vh - 50px); position: relative; z-index: 0; margin-left: -16px;')
-
+                    # Columna Grupo Artificial
+                    with ui.column().classes('items-start w-auto flex-shrink-0'):
+                        ui.label("Artificial illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
+                        with ui.row().classes('gap-1 items-start'):
+                            with ui.column().classes('flex-shrink-0') as state.c_all4: pass
+                    
+                    # Columna Grupo Nat+Art
+                    with ui.column().classes('items-start w-auto flex-shrink-0'):
+                        ui.label("Natural+Artificial illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
+                        with ui.row().classes('items-start gap-[2vh]'): # Gap aquí
+                            with ui.column().classes('flex-shrink-0') as state.c_all5: pass
+                            with ui.column().classes('flex-shrink-0') as state.c_all6: pass
+        # --- IFRAME VIEWER ---
+        state.iframe_container = ui.html(show_selected_images(), sanitize=False).classes('w-full flex-grow').style('border: none; margin: 0; padding: 0;')
 
 ui.run()
