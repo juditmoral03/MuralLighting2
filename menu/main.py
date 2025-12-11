@@ -51,6 +51,38 @@ async def main():
 
     state = SessionState()
 
+
+    # Dentro de main(), al principio:
+    
+    def format_exr(image_name):
+        # Esta lógica transforma "/menu/Natural/..." en "XII/Natural/..."
+        if image_name.startswith('/menu/'):
+            image_name = image_name[len('/menu/'):]
+        parts = image_name.rsplit('/', 1)
+        folder = parts[0]
+        file_name = parts[1].rsplit('.', 1)[0]
+        folder = folder.replace('+', '%2B')
+        return f"XII/{folder}/{file_name}.exr"
+    
+    # Al principio de main(), junto a format_exr:
+    
+    def format_label_html(text, image_path):
+        # 1. Formatear el texto principal
+        text_str = "<br>".join(str(t) for t in text) if isinstance(text, list) else str(text)
+        
+        # 2. Inferir el día (Day)
+        day = None
+        if image_path:
+            if "D2" in image_path: day = "Apr 1st"
+            elif "D3" in image_path: day = "Jun 6th"
+            elif "D1" in image_path: day = "Dec 25th"
+        
+        # 3. Combinar HTML
+        if day:
+            return f"{day}<br><span>{text_str}</span>"
+        else:
+            return text_str
+
     # --- 2. FUNCIONES AUXILIARES (DEFINIDAS DENTRO DE MAIN PARA ACCEDER A STATE) ---
 
     def show_selected_images():
@@ -90,16 +122,18 @@ async def main():
         # Añadimos un parámetro 'dummy' (&v=2) para engañar al navegador y que crea que es un archivo nuevo
         url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}&v=2"
     
+        # En la función show_selected_images
         html = f"""
         <div style="position: relative; width: 100%; height: 100%;">
             <iframe 
+                id="viewer-iframe" 
                 src="{url}" 
                 style="width:100%; height:100%; border:none; position: absolute; top:0; left:0; z-index:0;"
                 allowfullscreen
                 loading="lazy">
             </iframe>
-            <div style="position: absolute; bottom: 60px; left: 25%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label1}</div>
-            <div style="position: absolute; bottom: 60px; left: 75%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label2}</div>
+            <div id="label-left" style="position: absolute; bottom: 60px; left: 25%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label1}</div>
+            <div id="label-right" style="position: absolute; bottom: 60px; left: 75%; transform: translateX(-50%); font-size: 12px; font-weight: 500; color: #eee; text-align: center; text-shadow: 0 0 5px rgba(0,0,0,0.6); z-index: 2;">{label2}</div>
         </div>
         """
         return html
@@ -127,34 +161,47 @@ async def main():
                     selected_window = await ui.run_javascript('return localStorage.getItem("selectedWindow");')
                     
                     if not selected_window or selected_window == "none" or selected_window == "null": 
-                        ui.notify("⚠️ Select a window first (Click Left or Right view)", color='orange')
+                        ui.notify("⚠️ Select a window first", color='orange')
                         return
 
-                    # Convertimos la lista de textos a String JSON
                     text_json = json.dumps(text)
+                    exr_path = format_exr(image)
+                    
+                    # Generamos el nuevo HTML para el texto
+                    new_label_html = format_label_html(text, image)
 
                     if selected_window == "left":
                         state.selected_left = {"card": c, "image": image, "text": text}
-                        
-                        # --- CORRECCIÓN AQUÍ: Añadidas comillas simples '{...}' ---
                         await ui.run_javascript(f'localStorage.setItem("saved_L_img", "{image}");')
                         await ui.run_javascript(f'localStorage.setItem("saved_L_txt", \'{text_json}\');') 
                         
                         update_all_cards_visibility()
-                        if state.iframe_container: state.iframe_container.content = show_selected_images()
+                        
+                        # 1. Cambiar Imagen (Iframe)
+                        js_img = f'var iframe = document.getElementById("viewer-iframe"); if(iframe) {{ iframe.contentWindow.postMessage({{ "type": "change_left", "path": "{exr_path}" }}, "*"); }}'
+                        await ui.run_javascript(js_img)
+                        
+                        # 2. Cambiar Texto (Label) - ACTUALIZAMOS EL DOM DIRECTAMENTE
+                        # Usamos .innerHTML para que interprete los <br> y <span>
+                        await ui.run_javascript(f'document.getElementById("label-left").innerHTML = `{new_label_html}`;')
+                        
                         return
                     
                     if selected_window == "right":
                         state.selected_right = {"card": c, "image": image, "text": text}
-                        
-                        # --- CORRECCIÓN AQUÍ: Añadidas comillas simples '{...}' ---
                         await ui.run_javascript(f'localStorage.setItem("saved_R_img", "{image}");')
                         await ui.run_javascript(f'localStorage.setItem("saved_R_txt", \'{text_json}\');')
                         
                         update_all_cards_visibility()
-                        if state.iframe_container: state.iframe_container.content = show_selected_images()
-                        return
+                        
+                        # 1. Cambiar Imagen
+                        js_img = f'var iframe = document.getElementById("viewer-iframe"); if(iframe) {{ iframe.contentWindow.postMessage({{ "type": "change_right", "path": "{exr_path}" }}, "*"); }}'
+                        await ui.run_javascript(js_img)
 
+                        # 2. Cambiar Texto
+                        await ui.run_javascript(f'document.getElementById("label-right").innerHTML = `{new_label_html}`;')
+                        
+                        return
                 img.on('click', toggle_selection)
             with ui.card_section():
                 if isinstance(text, list):

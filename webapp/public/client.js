@@ -630,3 +630,21 @@ async function notifyPython(selection) {
 }
 
 window.addEventListener('DOMContentLoaded', applyStoredSelection);
+window.loadLeftImage = loadLeftImage;
+window.loadRightImage = loadRightImage;
+
+
+// Escuchar mensajes desde el padre (Python/NiceGUI en puerto 8080)
+window.addEventListener('message', function(event) {
+    // Es buena práctica verificar el origen, pero en local podemos saltarlo o confiar.
+    const data = event.data;
+
+    if (data.type === 'change_left') {
+        console.log("📨 Recibida orden cambiar Izquierda:", data.path);
+        loadLeftImage(data.path);
+    } 
+    else if (data.type === 'change_right') {
+        console.log("📨 Recibida orden cambiar Derecha:", data.path);
+        loadRightImage(data.path);
+    }
+});
