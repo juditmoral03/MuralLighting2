@@ -2,6 +2,7 @@ from nicegui import ui, app
 import os
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 
@@ -123,21 +124,33 @@ async def main():
                 state.all_cards[image].append(button)
                 
                 async def toggle_selection():
-                    # --- CAMBIO CLAVE: Preguntamos a JS (localStorage) qué ventana está seleccionada ---
-                    # Esto evita necesitar un endpoint global y sincroniza con el usuario actual
                     selected_window = await ui.run_javascript('return localStorage.getItem("selectedWindow");')
                     
                     if not selected_window or selected_window == "none" or selected_window == "null": 
                         ui.notify("⚠️ Select a window first (Click Left or Right view)", color='orange')
                         return
 
+                    # Convertimos la lista de textos a String JSON
+                    text_json = json.dumps(text)
+
                     if selected_window == "left":
                         state.selected_left = {"card": c, "image": image, "text": text}
+                        
+                        # --- CORRECCIÓN AQUÍ: Añadidas comillas simples '{...}' ---
+                        await ui.run_javascript(f'localStorage.setItem("saved_L_img", "{image}");')
+                        await ui.run_javascript(f'localStorage.setItem("saved_L_txt", \'{text_json}\');') 
+                        
                         update_all_cards_visibility()
                         if state.iframe_container: state.iframe_container.content = show_selected_images()
                         return
+                    
                     if selected_window == "right":
                         state.selected_right = {"card": c, "image": image, "text": text}
+                        
+                        # --- CORRECCIÓN AQUÍ: Añadidas comillas simples '{...}' ---
+                        await ui.run_javascript(f'localStorage.setItem("saved_R_img", "{image}");')
+                        await ui.run_javascript(f'localStorage.setItem("saved_R_txt", \'{text_json}\');')
+                        
                         update_all_cards_visibility()
                         if state.iframe_container: state.iframe_container.content = show_selected_images()
                         return
@@ -519,6 +532,45 @@ async def main():
                 
                 ui.timer(0.1, restore_globals, once=True)
 
+
+                # ... código existente de restore_globals ...
+
+                async def restore_session_images():
+                # 1. Recuperar datos de la Izquierda
+                    l_img = await ui.run_javascript('return localStorage.getItem("saved_L_img");')
+                    l_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_L_txt");') # Traemos texto crudo
+                    
+                    l_txt = None
+                    if l_txt_raw and l_txt_raw != "null":
+                        try:
+                            l_txt = json.loads(l_txt_raw) # Convertimos en Python (más seguro)
+                        except:
+                            pass # Si falla, simplemente ignoramos el texto
+
+                    if l_img and l_img != "null":
+                        state.selected_left = {"card": None, "image": l_img, "text": l_txt if l_txt else "Loading..."}
+
+                    # 2. Recuperar datos de la Derecha
+                    r_img = await ui.run_javascript('return localStorage.getItem("saved_R_img");')
+                    r_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_R_txt");')
+                    
+                    r_txt = None
+                    if r_txt_raw and r_txt_raw != "null":
+                        try:
+                            r_txt = json.loads(r_txt_raw)
+                        except:
+                            pass
+
+                    if r_img and r_img != "null":
+                        state.selected_right = {"card": None, "image": r_img, "text": r_txt if r_txt else "Loading..."}
+
+                    # 3. Actualizar vista
+                    if l_img or r_img:
+                        update_all_cards_visibility()
+                        if state.iframe_container: 
+                            state.iframe_container.content = show_selected_images()
+
+                ui.timer(0.2, restore_session_images, once=True)
             # --- PANELES DESPLEGABLES ---
             # --- PANELES DESPLEGABLES ---
             def hide_panel(panel_key):
