@@ -357,50 +357,12 @@ const params = {
     imgOverlay : 0.,
 };
 
-const gui = new GUI();
 
-gui.add(params, 'syncViews').name('Sync Views');
 
-const toneMappingFolder = gui.addFolder('Tone Mapping');
-toneMappingFolder.add(params, 'selectedTarget', { 'Both Windows': 'both', 'Window 1': 'window1', 'Window 2': 'window2' }).name('Apply To');
 
-var options = toneMappingMethods.map(method => method.name);
-toneMappingFolder.add(params, 'toneMappingMethodName', options).name('Tone mapping').onChange((value) => {
-    updateFolders(value);
-    updateToneMapping();
-});
 
-toneMappingFolder.add(params, 'fixNormalization').name('Fix normalization');
 
-for (let method of toneMappingMethods) {
-    const folder = toneMappingFolder.addFolder(method.name);
-    for (const [_, param] of Object.entries(method.parameters)) {
-        folder.add(param, "value", param.min, param.max).name(param.name).onChange(() => updateToneMapping());
-    }
-}
 
-toneMappingFolder.close(); 
-updateFolders(params.toneMappingMethodName); 
-
-function updateFolders(selectedOption) {
-    toneMappingFolder.folders.forEach(folder => {
-        const titleElement = folder.domElement.querySelector('.title');
-        if (folder._title === selectedOption) {
-            folder.open(); 
-            folder.domElement.style.display = ''; 
-            if (titleElement) titleElement.style.display = 'none'; 
-        } else {
-            folder.close(); 
-            folder.domElement.style.display = 'none'; 
-            if (titleElement) titleElement.style.display = ''; 
-        }
-    });
-}
-
-const imgDiffFolder = gui.addFolder('Image Difference');
-imgDiffFolder.add({ openDialog: () => openDialog() }, 'openDialog').name('Show Difference');
-imgDiffFolder.add(params, 'maxDiff', 0.001, 1.0).name('Max Difference').onChange((value) => updateDiffParams());
-imgDiffFolder.add(params, 'imgOverlay', 0.0, 1.0).name('Image Overlay').onChange((value) => updateDiffParams());
 
 
 ///// Input images
@@ -647,4 +609,173 @@ window.addEventListener('message', function(event) {
         console.log("📨 Recibida orden cambiar Derecha:", data.path);
         loadRightImage(data.path);
     }
+
+    // --- NUEVO CÓDIGO PARA SYNC ---
+    if (data.type === 'toggle_sync') {
+        console.log("🔄 Sync cambiado a:", data.value);
+        
+        // 1. Actualizar la variable lógica
+        params.syncViews = data.value;
+
+        // 2. Actualizar visualmente el checkbox del panel derecho (lil-gui)
+        if (gui && gui.controllers) {
+            gui.controllers.forEach(controller => {
+                if (controller.property === 'syncViews') {
+                    controller.setValue(data.value);
+                }
+            });
+        }
+        
+        // 3. Forzar resincronización inmediata al activar
+        if (data.value === true) {
+            syncing = false; 
+            // Copiamos la cámara Izquierda a la Derecha
+            rightView.camera.position.copy(leftView.camera.position);
+            rightView.camera.quaternion.copy(leftView.camera.quaternion);
+            rightView.camera.zoom = leftView.camera.zoom;
+            controlsR.target.copy(controlsL.target);
+        }
+    }
+
+    // --- BLOQUE TONE MAPPING (SOLUCIÓN DEFINITIVA V2) ---
+    if (data.type === 'tm_update') {
+        
+        // 1. Target
+        if (data.target) params.selectedTarget = data.target;
+
+        // 2. Mapeo
+        const algoMap = {
+            "toneMappingLinear": toneMappingMethods[0],
+            "toneMappingReinhardBasic": toneMappingMethods[1],
+            "toneMappingReinhardExtended": toneMappingMethods[2],
+            "toneMappingLuminance": toneMappingMethods[3]
+        };
+
+        const methodObj = algoMap[data.algo];
+
+        if (methodObj && methodObj.parameters) {
+            params.toneMappingMethodName = methodObj.name;
+            if (typeof updateFolders === 'function') updateFolders(methodObj.name);
+
+            // --- APLICACIÓN DE PARÁMETROS ROBUSTA ---
+            
+            // A) EXPOSURE (Linear, Basic)
+            if (methodObj.parameters.exposure) {
+                methodObj.parameters.exposure.value = data.exposure;
+            }
+
+            // B) REINHARD EXTENDED (Key & White)
+            if (data.algo === "toneMappingReinhardExtended") {
+                // Key / a
+                if (methodObj.parameters.key) methodObj.parameters.key.value = data.key;
+                else if (methodObj.parameters.a) methodObj.parameters.a.value = data.key;
+                else if (methodObj.parameters.exposure) methodObj.parameters.exposure.value = data.key;
+
+                // White / C_max
+                if (methodObj.parameters.C_max) methodObj.parameters.C_max.value = data.white;
+                else if (methodObj.parameters.C_white) methodObj.parameters.C_white.value = data.white;
+                else if (methodObj.parameters.white) methodObj.parameters.white.value = data.white;
+                else if (methodObj.parameters.whitePoint) methodObj.parameters.whitePoint.value = data.white;
+                else if (methodObj.parameters.L_white) methodObj.parameters.L_white.value = data.white;
+            }
+
+            // C) LUMINANCE (Max Lum) - AQUÍ ESTÁ EL ARREGLO
+            if (data.algo === "toneMappingLuminance") {
+                const paramKeys = Object.keys(methodObj.parameters);
+                
+                if (paramKeys.length > 0) {
+                    // TRUCO: Cogemos el primer parámetro que tenga el shader, se llame como se llame.
+                    // Esto arregla el error de nombres desconocidos.
+                    const realName = paramKeys[0]; 
+                    console.log("🔗 Conectando slider a:", realName);
+                    methodObj.parameters[realName].value = data.maxLum;
+                } else {
+                    console.warn("⚠️ No se encontraron parámetros en toneMappingLuminance");
+                }
+            }
+        }
+
+        // 4. Render
+        params.fixNormalization = data.fix;
+        if (typeof updateToneMapping === 'function') updateToneMapping();
+    }
+
+
+    // --- BLOQUE IMAGE DIFFERENCE ---
+    if (data.type === 'open_diff') {
+        console.log("🔘 Opening Difference Dialog from Menu");
+        // Llamamos a la función global openDialog() que ya tienes definida en client.js
+        if (typeof openDialog === 'function') {
+            openDialog();
+        }
+    }
+
+
+    // =========================================================
+//  LÓGICA DE CONTROLES HTML (Diferencia de Imágenes)
+// =========================================================
+
+// 1. Referencias a los elementos del DOM (Sliders en index.html)
+const sliderDiff = document.getElementById('slider_maxDiff');
+const sliderOver = document.getElementById('slider_overlay');
+const labelDiff  = document.getElementById('val_maxDiff');
+const labelOver  = document.getElementById('val_overlay');
+
+// 2. Activar listeners si existen los elementos
+if (sliderDiff && sliderOver) {
+    // Escuchar cambios en Max Difference
+    sliderDiff.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        params.maxDiff = val;
+        labelDiff.textContent = val.toFixed(3); 
+        updateDiffParams(); 
+    });
+
+    // Escuchar cambios en Image Overlay
+    sliderOver.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        params.imgOverlay = val;
+        labelOver.textContent = val.toFixed(2); 
+        updateDiffParams(); 
+    });
+}
+
+// =========================================================
+//  LISTENER DE MENSAJES (Python -> JS)
+// =========================================================
+
+window.addEventListener('message', function(event) {
+    const data = event.data;
+
+    // --- (Aquí van tus otros ifs: change_left, tm_update, sync, etc.) ---
+    // Asegúrate de MANTENER los bloques anteriores de tone mapping, sync, etc.
+    // Solo reemplaza o añade la parte de 'toggle_diff' abajo.
+
+    if (data.type === 'change_left') { loadLeftImage(data.path); }
+    if (data.type === 'change_right') { loadRightImage(data.path); }
+    
+    // ... Tu bloque de toggle_sync ...
+    // ... Tu bloque de tm_update ...
+
+
+    // --- BLOQUE IMAGE DIFFERENCE (TOGGLE ARREGLADO) ---
+    if (data.type === 'toggle_diff') {
+        console.log("🔘 Toggle Difference Window");
+        
+        const dialog = document.getElementById('differenceDialog');
+        if (dialog) {
+            // USAMOS getComputedStyle: La forma robusta de saber si está visible
+            const style = window.getComputedStyle(dialog);
+            
+            if (style.display === 'none') {
+                // Si está oculto -> Abrir
+                if (typeof openDialog === 'function') openDialog();
+            } else {
+                // Si está visible (flex, block, etc) -> Cerrar
+                if (typeof closeDialog === 'function') closeDialog();
+            }
+        }
+    }
+});
+
 });

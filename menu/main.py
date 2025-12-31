@@ -16,9 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# NOTA: Hemos eliminado las variables globales y el endpoint @app.post('/set_selected_window')
-# porque causan conflictos entre usuarios.
-
 menu_path = os.path.dirname(__file__) 
 app.add_static_files('/menu', menu_path)
 
@@ -41,7 +38,7 @@ async def main():
             self.day = None
             self.selected_left = None
             self.selected_right = None
-            self.all_cards = {} # Diccionario local de cartas
+            self.all_cards = {} 
             self.iframe_container = None
             self.iframe = None
             # Placeholders para los contenedores UI
@@ -51,11 +48,7 @@ async def main():
 
     state = SessionState()
 
-
-    # Dentro de main(), al principio:
-    
     def format_exr(image_name):
-        # Esta lógica transforma "/menu/Natural/..." en "XII/Natural/..."
         if image_name.startswith('/menu/'):
             image_name = image_name[len('/menu/'):]
         parts = image_name.rsplit('/', 1)
@@ -64,29 +57,23 @@ async def main():
         folder = folder.replace('+', '%2B')
         return f"XII/{folder}/{file_name}.exr"
     
-    # Al principio de main(), junto a format_exr:
-    
     def format_label_html(text, image_path):
-        # 1. Formatear el texto principal
         text_str = "<br>".join(str(t) for t in text) if isinstance(text, list) else str(text)
-        
-        # 2. Inferir el día (Day)
         day = None
         if image_path:
             if "D2" in image_path: day = "Apr 1st"
             elif "D3" in image_path: day = "Jun 6th"
             elif "D1" in image_path: day = "Dec 25th"
         
-        # 3. Combinar HTML
         if day:
             return f"{day}<br><span>{text_str}</span>"
         else:
             return text_str
 
-    # --- 2. FUNCIONES AUXILIARES (DEFINIDAS DENTRO DE MAIN PARA ACCEDER A STATE) ---
+    # --- 2. FUNCIONES AUXILIARES ---
 
     def show_selected_images():
-        def format_exr(image_name):
+        def format_exr_inner(image_name):
             if image_name.startswith('/menu/'):
                 image_name = image_name[len('/menu/'):]
             parts = image_name.rsplit('/', 1)
@@ -107,8 +94,8 @@ async def main():
             elif "D1" in image_path: return "Dec 25th"
             return None
         
-        img1 = format_exr(state.selected_left["image"]) if state.selected_left else DEFAULT_IMAGE
-        img2 = format_exr(state.selected_right["image"]) if state.selected_right else DEFAULT_IMAGE2
+        img1 = format_exr_inner(state.selected_left["image"]) if state.selected_left else DEFAULT_IMAGE
+        img2 = format_exr_inner(state.selected_right["image"]) if state.selected_right else DEFAULT_IMAGE2
 
         label1_main = format_label_text(state.selected_left["text"]) if state.selected_left else "Hanging oil lamp"
         label2_main = format_label_text(state.selected_right["text"]) if state.selected_right else "Two table candles"
@@ -119,10 +106,8 @@ async def main():
         label1 = f"{day1}<br><span>{label1_main}</span>" if day1 else label1_main
         label2 = f"{day2}<br><span>{label2_main}</span>" if day2 else label2_main
     
-        # Añadimos un parámetro 'dummy' (&v=2) para engañar al navegador y que crea que es un archivo nuevo
         url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}&v=2"
     
-        # En la función show_selected_images
         html = f"""
         <div style="position: relative; width: 100%; height: 100%;">
             <iframe 
@@ -166,41 +151,26 @@ async def main():
 
                     text_json = json.dumps(text)
                     exr_path = format_exr(image)
-                    
-                    # Generamos el nuevo HTML para el texto
                     new_label_html = format_label_html(text, image)
 
                     if selected_window == "left":
                         state.selected_left = {"card": c, "image": image, "text": text}
                         await ui.run_javascript(f'localStorage.setItem("saved_L_img", "{image}");')
                         await ui.run_javascript(f'localStorage.setItem("saved_L_txt", \'{text_json}\');') 
-                        
                         update_all_cards_visibility()
-                        
-                        # 1. Cambiar Imagen (Iframe)
                         js_img = f'var iframe = document.getElementById("viewer-iframe"); if(iframe) {{ iframe.contentWindow.postMessage({{ "type": "change_left", "path": "{exr_path}" }}, "*"); }}'
                         await ui.run_javascript(js_img)
-                        
-                        # 2. Cambiar Texto (Label) - ACTUALIZAMOS EL DOM DIRECTAMENTE
-                        # Usamos .innerHTML para que interprete los <br> y <span>
                         await ui.run_javascript(f'document.getElementById("label-left").innerHTML = `{new_label_html}`;')
-                        
                         return
                     
                     if selected_window == "right":
                         state.selected_right = {"card": c, "image": image, "text": text}
                         await ui.run_javascript(f'localStorage.setItem("saved_R_img", "{image}");')
                         await ui.run_javascript(f'localStorage.setItem("saved_R_txt", \'{text_json}\');')
-                        
                         update_all_cards_visibility()
-                        
-                        # 1. Cambiar Imagen
                         js_img = f'var iframe = document.getElementById("viewer-iframe"); if(iframe) {{ iframe.contentWindow.postMessage({{ "type": "change_right", "path": "{exr_path}" }}, "*"); }}'
                         await ui.run_javascript(js_img)
-
-                        # 2. Cambiar Texto
                         await ui.run_javascript(f'document.getElementById("label-right").innerHTML = `{new_label_html}`;')
-                        
                         return
                 img.on('click', toggle_selection)
             with ui.card_section():
@@ -208,10 +178,9 @@ async def main():
                     for t in text: ui.markdown(t)
                 else: ui.markdown(text)
 
-    classes_card = "h-[24vh] w-[15vh]"
+    classes_card = "h-[20vh] w-[15vh]"
 
-    # --- LÓGICA DE REFRESCO (Usa state.hour y state.day) ---
-    # --- LÓGICA DE REFRESCO ACTUALIZADA ---
+    # --- LÓGICA DE REFRESCO ---
     def refresh_cards_natural():
         if not state.c_nat1: return
         
@@ -222,12 +191,10 @@ async def main():
         if gh == "10:53": v_D2T1=v_D2T2=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T3=False
         if gh == "10:56": v_D2T1=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T2=v_D1T3=False
         
-        lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
+        lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 2px; color: black;"
 
-        # Grupo 1: Apr 1st
         show_nat1 = (state.day is None or state.day == "Apr 1st" or state.day == "All") and (v_D2T1 or v_D2T2 or v_D2T3)
-        state.c_nat1.set_visibility(show_nat1) # Ocultamos si no hay nada
-        state.c_nat1.clear()
+        state.c_nat1.set_visibility(show_nat1); state.c_nat1.clear()
         if show_nat1:
             with state.c_nat1:
                 ui.label("Apr 1st").style(lbl_style)
@@ -236,10 +203,8 @@ async def main():
                     if v_D2T2: create_card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes_card)
                     if v_D2T3: create_card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes_card)
 
-        # Grupo 2: Jun 6th
         show_nat2 = (state.day is None or state.day == "Jun 6th" or state.day == "All") and (v_D3T1 or v_D3T2 or v_D3T3)
-        state.c_nat2.set_visibility(show_nat2)
-        state.c_nat2.clear()
+        state.c_nat2.set_visibility(show_nat2); state.c_nat2.clear()
         if show_nat2:
             with state.c_nat2:
                 ui.label("Jun 6th").style(lbl_style)
@@ -248,10 +213,8 @@ async def main():
                     if v_D3T2: create_card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes_card)
                     if v_D3T3: create_card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes_card)
 
-        # Grupo 3: Dec 25th
         show_nat3 = (state.day is None or state.day == "Dec 25th" or state.day == "All") and (v_D1T1 or v_D1T2 or v_D1T3)
-        state.c_nat3.set_visibility(show_nat3)
-        state.c_nat3.clear()
+        state.c_nat3.set_visibility(show_nat3); state.c_nat3.clear()
         if show_nat3:
             with state.c_nat3:
                 ui.label("Dec 25th").style(lbl_style)
@@ -272,34 +235,29 @@ async def main():
         
         lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
 
-        # Grupo 1
         show_na1 = (v_D2T3_C2 or v_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
-        state.c_na1.set_visibility(show_na1)
-        state.c_na1.clear()
+        state.c_na1.set_visibility(show_na1); state.c_na1.clear()
         if show_na1:
             with state.c_na1:
                 ui.label("Apr 1st").style(lbl_style)
                 with ui.row().classes('gap-2 items-start'):
                     if v_D2T3_C2: create_card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes_card)
-                    if v_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes_card)
+                    if v_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,"All artificial lighting"], classes_card)
         
-        # Grupo 2
         show_na2 = (v_D1T3_C5 or v_D1T3_C2) and (state.day is None or state.day == "Dec 25th" or state.day == "All")
-        state.c_na2.set_visibility(show_na2)
-        state.c_na2.clear()
+        state.c_na2.set_visibility(show_na2); state.c_na2.clear()
         if show_na2:
             with state.c_na2:
                 ui.label("Dec 25th").style(lbl_style)
                 with ui.row().classes('gap-2 items-start'):
                     if v_D1T3_C2: create_card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes_card)
-                    if v_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes_card)
+                    if v_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,"All artificial lighting"], classes_card)
         update_all_cards_visibility()
 
     def refresh_cards_all():
         if not state.c_all1: return
         
         gh = state.hour
-        # ... Tus variables booleanas de hora (copia aquí toda tu lógica de horas igual que antes) ...
         v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=True; v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=True; v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=True
         v_na_D1T3_C2=v_na_D1T3_C5=True; v_na_D2T3_C2=v_na_D2T3_C5=True
 
@@ -359,7 +317,7 @@ async def main():
                     if v_nat_D1T2: create_card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes_card)
                     if v_nat_D1T3: create_card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes_card)
         
-        # --- SECCIÓN ARTIFICIAL (En All) - Siempre visible ---
+        # --- SECCIÓN ARTIFICIAL (En All) ---
         state.c_all4.clear()
         with state.c_all4:
              ui.label("Spacer").style(lbl_style + "visibility: hidden;")
@@ -368,7 +326,7 @@ async def main():
                 create_card("/menu/Artificial/C2-pv2.jpg", [C2], classes_card)
                 create_card("/menu/Artificial/C3-pv2.jpg", [C3], classes_card)
                 create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
-                create_card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes_card)
+                create_card("/menu/Artificial/C5-pv2.jpg", ["All artificial lighting"], classes_card)
         
         # --- SECCIÓN NAT+ART (En All) ---
         show_all5 = (v_na_D2T3_C2 or v_na_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
@@ -378,7 +336,7 @@ async def main():
                 ui.label("Apr 1st").style(lbl_style)
                 with ui.row().classes('gap-2 items-start'):
                     if v_na_D2T3_C2: create_card("/menu/Natural+Artificial/D2T3-C2-pv2.jpg", [D2T3,C2], classes_card)
-                    if v_na_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,C1,C2,C4], classes_card)
+                    if v_na_D2T3_C5: create_card("/menu/Natural+Artificial/D2T3-C5-pv2.jpg", [D2T3,"All artificial lighting"], classes_card)
         
         show_all6 = (v_na_D1T3_C5 or v_na_D1T3_C2) and (state.day is None or state.day == "Dec 25th" or state.day == "All")
         state.c_all6.set_visibility(show_all6); state.c_all6.clear()
@@ -387,7 +345,7 @@ async def main():
                 ui.label("Dec 25th").style(lbl_style)
                 with ui.row().classes('gap-2 items-start'):
                     if v_na_D1T3_C2: create_card("/menu/Natural+Artificial/D1T3-C2-pv2.jpg", [D1T3,C2], classes_card)
-                    if v_na_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,C1,C2,C4], classes_card)
+                    if v_na_D1T3_C5: create_card("/menu/Natural+Artificial/D1T3-C5-pv2.jpg", [D1T3,"All artificial lighting"], classes_card)
         update_all_cards_visibility()
 
     def refresh_all_views():
@@ -396,8 +354,6 @@ async def main():
         refresh_cards_all()
 
     # --- HTML Y ESTILOS ---
-    
-    # Javascript helper para restaurar la ventana seleccionada en local storage (Visuales)
     ui.add_body_html("""
     <script>
     async function restoreSelectedWindow() {
@@ -407,7 +363,6 @@ async def main():
         if (saved) {
             updateSelectedWindowHighlight(saved);
         }
-        // Listener para clicks en el iframe
         container.addEventListener('click', async (e) => {
             const rect = container.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -417,44 +372,26 @@ async def main():
         });
     }
     window.addEventListener('load', restoreSelectedWindow);
-    </script>
-    """)
-
-
-    # ... código anterior ...
-
-    # JS helper para escuchar al iframe y guardar la selección en el localStorage PRINCIPAL
-    ui.add_body_html("""
-    <script>
-    // 1. Escuchar mensajes que vienen del Iframe (puerto 3006)
     window.addEventListener('message', function(event) {
-        // Verificamos que sea nuestro mensaje
         if (event.data && event.data.type === 'window_selected') {
             console.log("Recibido desde Iframe:", event.data.value);
-            
-            // 2. Guardar en el localStorage del PADRE (puerto 8080)
             localStorage.setItem('selectedWindow', event.data.value);
         }
     });
-
-    // Código visual para restaurar (opcional, el que ya tenías)
-    async function restoreSelectedWindow() {
-        // ... (tu código anterior si lo necesitas) ...
-    }
     </script>
     """)
-    
-    # ... resto del código ...
 
     ui.add_head_html('''
     <style>
     body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
     .menu-row { width: 100%; margin: 0; padding: 0; background-color: white; }
+    
     .dropdown-panel {
         position: absolute; top: 100%; left: 0; right: 0; height: auto; max-height: 85vh;
         background-color: white; z-index: 40; display: flex; flex-direction: column; align-items: stretch;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding-bottom: 25px; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding-bottom: 5px; 
     }
+    
     .dropdown-panel .q-card { 
         box-shadow: 0 2px 5px rgba(0,0,0,0.15) !important; border: 1px solid #e0e0e0;
         display: flex; flex-direction: column; padding: 0 !important; margin: 0 !important;
@@ -463,14 +400,22 @@ async def main():
     .dropdown-panel .q-card:hover {
         transform: translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.2) !important; z-index: 10;
     }
-    .dropdown-panel .q-card .q-img { height: 60%; width: 100%; object-fit: cover; }
+    
+    .dropdown-panel .q-card .q-img { height: 70%; width: 100%; object-fit: cover; }
+    
     .dropdown-panel .q-card__section { 
-        height: 40%; padding: 2px 4px !important; display: flex; flex-direction: column;
-        justify-content: center; align-items: center; text-align: center; line-height: 1.15; 
+        height: 30%; 
+        display: flex !important; flex-direction: column !important;
+        justify-content: center !important; align-items: center !important; 
     }
-    .dropdown-panel .q-card__section p, .dropdown-panel .q-card__section div {
-        font-size: 1.25vh; color: #333; overflow: hidden;
+
+    .dropdown-panel .q-card__section div, 
+    .dropdown-panel .q-card__section p,
+    .dropdown-panel .q-card__section span {
+        text-align: center !important; width: 100% !important; margin: 0 !important;
+        line-height: 1.1 !important; font-size: 1.15vh !important; color: #333;
     }
+
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24 }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -485,11 +430,148 @@ async def main():
     with ui.column().classes('absolute-full gap-0 no-wrap'):
 
         # --- MENU ROW ---
-        with ui.element('div').classes('w-full bg-white shadow-sm z-50 relative flex flex-col md:flex-row items-center px-2 md:px-6 py-2 md:py-0 h-auto md:h-[80px]'):
+        with ui.element('div').classes('w-full bg-white shadow-sm z-50 relative flex flex-col md:flex-row items-center px-2 md:px-6 py-1 md:py-0 h-auto md:h-[50px]'):
             
-            ui.element('div').classes('hidden md:block') # Spacer Left
+            # --- [1] IZQUIERDA: BOTÓN SYNC VIEWS ---
+            # Colocamos esto PRIMERO para que aparezca a la izquierda de todo
+            with ui.row().classes('items-center justify-start md:mr-auto z-50'):
+                sync_state = {'active': True}
+                async def toggle_sync():
+                    sync_state['active'] = not sync_state['active']
+                    if sync_state['active']: icon_sync.classes('text-black', remove='text-gray-300')
+                    else: icon_sync.classes('text-gray-300', remove='text-black')
+                    
+                    await ui.run_javascript(f'''
+                        var iframe = document.getElementById("viewer-iframe");
+                        if(iframe) {{
+                            iframe.contentWindow.postMessage({{ 
+                                "type": "toggle_sync", 
+                                "value": {str(sync_state['active']).lower()} 
+                            }}, "*");
+                        }}
+                    ''')
 
-            # 2. Categorías (Centro)
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    icon_sync = ui.icon('link', size="22px") \
+                        .classes('cursor-pointer text-black hover:text-gray-600 material-symbols-outlined transition-colors') \
+                        .on('click', toggle_sync)
+                    with ui.tooltip('Sync Views'): pass
+
+
+                 # --- [A] TONE MAPPING (DINÁMICO) ---
+                tm_state = {
+                    'algo': 'toneMappingReinhardBasic', 
+                    'target': 'both',
+                    'fix': False,
+                    # Parámetros para los diferentes modos
+                    'exposure': 1.0,  # Para Linear y Reinhard Basic
+                    'key': 0.18,      # Para Reinhard Extended (Key value)
+                    'white': 1.0,     # Para Reinhard Extended (L White)
+                    'maxLum': 0.00005    # Para Luminance
+                }
+
+                async def update_tm_js():
+                    # Enviamos TODOS los valores al JS. El JS decidirá cuál usar.
+                    await ui.run_javascript(f'''
+                        var iframe = document.getElementById("viewer-iframe");
+                        if(iframe) {{
+                            iframe.contentWindow.postMessage({{ 
+                                "type": "tm_update", 
+                                "algo": "{tm_state['algo']}",
+                                "target": "{tm_state['target']}",
+                                "fix": {str(tm_state['fix']).lower()},
+                                "exposure": {tm_state['exposure']},
+                                "key": {tm_state['key']},
+                                "white": {tm_state['white']},
+                                "maxLum": {tm_state['maxLum']}
+                            }}, "*");
+                        }}
+                    ''')
+
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    ui.icon('tune', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined')
+                    
+                    with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-4 z-50 w-64'):
+                        ui.label("Tone Mapping").classes('text-xs font-bold text-gray-400 mb-2 uppercase')
+                        
+                        # 1. Apply To
+                        ui.select(
+                            options={'both': 'Both Windows', 'window1': 'Window 1', 'window2': 'Window 2'},
+                            value=tm_state['target'], label="Apply To"
+                        ).bind_value(tm_state, 'target').on_value_change(update_tm_js).classes('w-full mb-2 text-sm')
+
+                        # 2. Algorithm Selector
+                        ui.select(
+                            options={
+                                "toneMappingLinear": "Linear", 
+                                "toneMappingReinhardBasic": "Reinhard Basic", 
+                                "toneMappingReinhardExtended": "Reinhard Extended", 
+                                "toneMappingLuminance": "Luminance"
+                            },
+                            value=tm_state['algo'], label="Algorithm"
+                        ).bind_value(tm_state, 'algo').on_value_change(update_tm_js).classes('w-full mb-2 text-sm')
+                        
+                        # --- CONTROLES DINÁMICOS ---
+
+                        # A) EXPOSURE (Solo para Linear y Reinhard Basic)
+                        with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x in ['toneMappingLinear', 'toneMappingReinhardBasic']):
+                            ui.label("Exposure").classes('text-xs text-gray-500 mt-2')
+                            with ui.row().classes('w-full items-center gap-2'):
+                                ui.slider(min=0.1, max=10.0, step=0.1, value=tm_state['exposure']).bind_value(tm_state, 'exposure').on_value_change(update_tm_js).classes('col-grow')
+                                ui.label().bind_text_from(tm_state, 'exposure', backward=lambda x: f"{x:.1f}").classes('text-xs w-8 text-right')
+
+                        # B) REINHARD EXTENDED (Key y L White)
+                        with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x == 'toneMappingReinhardExtended'):
+                            # Key
+                            ui.label("Key").classes('text-xs text-gray-500 mt-2')
+                            with ui.row().classes('w-full items-center gap-2'):
+                                ui.slider(min=0.0, max=1.0, step=0.01, value=tm_state['key']).bind_value(tm_state, 'key').on_value_change(update_tm_js).classes('col-grow')
+                                ui.label().bind_text_from(tm_state, 'key', backward=lambda x: f"{x:.2f}").classes('text-xs w-8 text-right')
+                            # L White
+                            ui.label("L White").classes('text-xs text-gray-500 mt-1')
+                            with ui.row().classes('w-full items-center gap-2'):
+                                ui.slider(min=0.1, max=10.0, step=0.1, value=tm_state['white']).bind_value(tm_state, 'white').on_value_change(update_tm_js).classes('col-grow')
+                                ui.label().bind_text_from(tm_state, 'white', backward=lambda x: f"{x:.1f}").classes('text-xs w-8 text-right')
+
+                        # C) LUMINANCE (Max Luminance)
+                        # C) LUMINANCE (Max Luminance)
+                        with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x == 'toneMappingLuminance'):
+                            ui.label("Max Luminance").classes('text-xs text-gray-500 mt-2')
+                            with ui.row().classes('w-full items-center gap-2'):
+                                ui.slider(min=0.00001, max=0.001, step=0.00001, value=tm_state['maxLum']) \
+                                    .bind_value(tm_state, 'maxLum') \
+                                    .on_value_change(update_tm_js) \
+                                    .classes('col-grow')
+                                
+                                # CAMBIO AQUÍ: Añadido .rstrip('0').rstrip('.') para quitar ceros finales
+                                ui.label().bind_text_from(
+                                    tm_state, 
+                                    'maxLum', 
+                                    backward=lambda x: f"{x:.5f}".rstrip('0').rstrip('.')
+                                ).classes('text-xs w-12 text-right')
+                                
+                        # Fix Normalization
+                        ui.separator().classes('my-2')
+                        ui.switch('Fix Normalization', value=tm_state['fix']).bind_value(tm_state, 'fix').on_value_change(update_tm_js).props('dense').classes('text-sm text-gray-700 w-full') 
+                    with ui.tooltip('Tone Mapping'): pass
+                    
+                    
+                async def open_diff_js():
+                    await ui.run_javascript('''
+                        var iframe = document.getElementById("viewer-iframe");
+                        if(iframe) {
+                            iframe.contentWindow.postMessage({ "type": "open_diff" }, "*");
+                        }
+                    ''')
+
+                with ui.element('div').classes('relative flex items-center justify-center w-10'):
+                    ui.icon('difference', size="22px") \
+                        .classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined') \
+                        .on('click', open_diff_js)
+                    with ui.tooltip('Image Difference'): pass
+
+
+            # --- [2] CENTRO: CATEGORÍAS (MENÚ) ---
             active_panel = {'name': None}
             def show_panel(e, cat):
                 current = active_panel['name']
@@ -504,23 +586,25 @@ async def main():
                     active_panel['name'] = None
 
             with ui.row().classes('w-full md:w-auto flex justify-center gap-8 md:absolute md:left-1/2 md:transform md:-translate-x-1/2 flex-wrap md:flex-nowrap'):
+                icon_size = '24px' 
                 for cat in categories:
-                    # (Tu lógica de iconos se mantiene igual)
-                    if cat == "Inici": ui.icon('home', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-                    elif cat == "Natural illumination": ui.icon('sunny', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
-                    elif cat == "Artificial illumination": ui.icon('lightbulb_2', size='28px').classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    if cat == "Inici": ui.icon('home', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    elif cat == "Natural illumination": ui.icon('sunny', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                    elif cat == "Artificial illumination": ui.icon('lightbulb_2', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
                     elif cat == "Natural + Artificial illumination":
                         with ui.row().classes('cursor-pointer hover:bg-gray-100 p-1 rounded transition items-center gap-1').on('mouseover', lambda e, cat=cat: show_panel(e, cat)):
-                            ui.icon('sunny', size='28px').classes('material-symbols-outlined text-gray-700')
-                            ui.label('+').style('font-size: 20px; font-weight: 300;')
-                            ui.icon('lightbulb_2', size='28px').classes('material-symbols-outlined text-gray-700')
+                            ui.icon('sunny', size=icon_size).classes('material-symbols-outlined text-gray-700')
+                            ui.label('+').style('font-size: 18px; font-weight: 300;')
+                            ui.icon('lightbulb_2', size=icon_size).classes('material-symbols-outlined text-gray-700')
                     elif cat == "All combinations":
-                        ui.label('ALL').classes('cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition text-gray-700 font-light text-lg').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
+                        ui.label('ALL').classes('cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition text-gray-700 font-light text-md').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
 
-            # 3. Filtros (Derecha)
+
+            # --- [3] DERECHA: FILTROS ---
             with ui.row().classes('w-full md:w-auto flex justify-center md:justify-end gap-6 md:ml-auto items-center flex-nowrap mt-2 md:mt-0'):
                 
-                # HOUR
+                
+                # --- [B] HOUR ---
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     def toggle_hour_menu(): hour_menu.toggle()
                     icon_hour = ui.icon('access_time', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_hour_menu)
@@ -537,7 +621,7 @@ async def main():
                         ui.menu_item("11:53 am", lambda: set_global_hour_fn("11:53")); ui.menu_item("12:53 pm", lambda: set_global_hour_fn("12:53"))
                         ui.menu_item("13:53 pm", lambda: set_global_hour_fn("13:53")); ui.menu_item("13:56 pm", lambda: set_global_hour_fn("13:56"))
 
-                # DAY
+                # --- [C] DAY ---
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     def toggle_day_menu(): day_menu.toggle()
                     icon_day = ui.icon('calendar_today', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_day_menu)
@@ -552,16 +636,12 @@ async def main():
                         ui.menu_item("All", lambda: set_global_day_fn("All")); ui.menu_item("Apr 1st", lambda: set_global_day_fn("Apr 1st"))
                         ui.menu_item("Jun 6th", lambda: set_global_day_fn("Jun 6th")); ui.menu_item("Dec 25th", lambda: set_global_day_fn("Dec 25th"))
 
-                # VISIBILITY
-                # VISIBILITY
-                # CORRECCIÓN: Usamos 'with' para meter el icono DENTRO del div, igual que los otros.
+                # --- [D] VISIBILITY ---
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
-                    ui.icon('visibility', size="22px") \
-                        .classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined') \
-                       
+                    ui.icon('visibility', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined')
 
+                # --- HELPERS JS ---
                 async def restore_globals():
-                    # Recuperar estado del navegador para este usuario
                     g_hour = await ui.run_javascript('return localStorage.getItem("global_hour")')
                     g_day = await ui.run_javascript('return localStorage.getItem("global_day")')
                     
@@ -574,113 +654,90 @@ async def main():
                         state.day = g_day; icon_day.set_visibility(False); label_day.set_text(g_day); label_day.set_visibility(True)
                     else: 
                         icon_day.set_visibility(True); label_day.set_visibility(False)
-                    
                     refresh_all_views()
-                
                 ui.timer(0.1, restore_globals, once=True)
 
-
-                # ... código existente de restore_globals ...
-
                 async def restore_session_images():
-                # 1. Recuperar datos de la Izquierda
                     l_img = await ui.run_javascript('return localStorage.getItem("saved_L_img");')
-                    l_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_L_txt");') # Traemos texto crudo
-                    
+                    l_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_L_txt");')
                     l_txt = None
                     if l_txt_raw and l_txt_raw != "null":
-                        try:
-                            l_txt = json.loads(l_txt_raw) # Convertimos en Python (más seguro)
-                        except:
-                            pass # Si falla, simplemente ignoramos el texto
+                        try: l_txt = json.loads(l_txt_raw)
+                        except: pass
 
                     if l_img and l_img != "null":
                         state.selected_left = {"card": None, "image": l_img, "text": l_txt if l_txt else "Loading..."}
 
-                    # 2. Recuperar datos de la Derecha
                     r_img = await ui.run_javascript('return localStorage.getItem("saved_R_img");')
                     r_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_R_txt");')
-                    
                     r_txt = None
                     if r_txt_raw and r_txt_raw != "null":
-                        try:
-                            r_txt = json.loads(r_txt_raw)
-                        except:
-                            pass
+                        try: r_txt = json.loads(r_txt_raw)
+                        except: pass
 
                     if r_img and r_img != "null":
                         state.selected_right = {"card": None, "image": r_img, "text": r_txt if r_txt else "Loading..."}
 
-                    # 3. Actualizar vista
                     if l_img or r_img:
                         update_all_cards_visibility()
                         if state.iframe_container: 
                             state.iframe_container.content = show_selected_images()
 
                 ui.timer(0.2, restore_session_images, once=True)
-            # --- PANELES DESPLEGABLES ---
-            # --- PANELES DESPLEGABLES ---
+
+            # --- PANELES DESPLEGABLES (COMPACTOS) ---
             def hide_panel(panel_key):
                 if panel_key in menu_panels: menu_panels[panel_key].set_visibility(False)
                 if active_panel['name'] == panel_key: active_panel['name'] = None
 
-            # 1. NATURAL ILLUMINATION
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Natural illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural illumination"))
-                # CAMBIO: Añadido gap-[3vh] y quitados los margin-left de las columnas
-                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
                     with ui.row().classes('justify-start gap-[3vh] items-start flex-nowrap').style('display: inline-flex;'):
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat1: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat2: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat3: pass
 
-            # 2. ARTIFICIAL ILLUMINATION
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Artificial illumination"))
-                with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
                     with ui.row().classes('justify-start gap-2 items-start flex-nowrap').style('display: inline-flex;'):
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start; margin-left: 0px;'):
                             with ui.row().classes('gap-2 items-start'):
                                 create_card("/menu/Artificial/C1-pv2.jpg", [C1], classes_card); create_card("/menu/Artificial/C2-pv2.jpg", [C2], classes_card)
                                 create_card("/menu/Artificial/C3-pv2.jpg", [C3], classes_card); create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
-                                create_card("/menu/Artificial/C5-pv2.jpg", [C1, C2, C4], classes_card)
+                                create_card("/menu/Artificial/C5-pv2.jpg", ["All artificial lighting"], classes_card)
 
-            # 3. NATURAL + ARTIFICIAL
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Natural + Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural + Artificial illumination"))
-                # CAMBIO: Añadido gap-[3vh] y quitados los margin-left
-                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 3vh; padding-bottom: 3vh;'):
+                with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
                     with ui.row().classes('justify-start gap-[3vh] items-start flex-nowrap').style('display: inline-flex;'):
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na1: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na2: pass
 
-            # 4. ALL COMBINATIONS
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["All combinations"] = panel; panel.on('mouseleave', lambda: hide_panel("All combinations"))
-                # CAMBIO: Ajuste de gaps y quitados los margin-left internos
-                with ui.row().classes('cards-wrapper w-full overflow-x-auto overflow-y-hidden no-scrollbar flex-nowrap pl-10 pr-10 items-start').style('white-space: nowrap; margin-top: 3vh; padding-bottom: 3vh; gap: 6vh;'):
+                with ui.row().classes('cards-wrapper w-full overflow-x-auto overflow-y-hidden no-scrollbar flex-nowrap pl-10 pr-10 items-start').style('white-space: nowrap; margin-top: 1.5vh; padding-bottom: 1.5vh; gap: 6vh;'):
                     
-                    # Columna Grupo Natural
                     with ui.column().classes('items-start w-auto flex-shrink-0'):
-                        ui.label("Natural illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
-                        with ui.row().classes('items-start gap-[2vh]'): # Gap aquí
+                        ui.label("Natural illumination").classes('text-black font-semibold mb-1').style('font-size: 2vh;') 
+                        with ui.row().classes('items-start gap-[2vh]'): 
                             with ui.column().classes('flex-shrink-0') as state.c_all1: pass
                             with ui.column().classes('flex-shrink-0') as state.c_all2: pass
                             with ui.column().classes('flex-shrink-0') as state.c_all3: pass
                     
-                    # Columna Grupo Artificial
                     with ui.column().classes('items-start w-auto flex-shrink-0'):
-                        ui.label("Artificial illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
+                        ui.label("Artificial illumination").classes('text-black font-semibold mb-1').style('font-size: 2vh;') 
                         with ui.row().classes('gap-1 items-start'):
                             with ui.column().classes('flex-shrink-0') as state.c_all4: pass
                     
-                    # Columna Grupo Nat+Art
                     with ui.column().classes('items-start w-auto flex-shrink-0'):
-                        ui.label("Natural+Artificial illumination").classes('text-black font-semibold mb-2').style('font-size: 2vh;')
-                        with ui.row().classes('items-start gap-[2vh]'): # Gap aquí
+                        ui.label("Natural+Artificial illumination").classes('text-black font-semibold mb-1').style('font-size: 2vh;') 
+                        with ui.row().classes('items-start gap-[2vh]'): 
                             with ui.column().classes('flex-shrink-0') as state.c_all5: pass
                             with ui.column().classes('flex-shrink-0') as state.c_all6: pass
+        
         # --- IFRAME VIEWER ---
         state.iframe_container = ui.html(show_selected_images(), sanitize=False).classes('w-full flex-grow').style('border: none; margin: 0; padding: 0;')
 
-ui.run()
+ui.run(title="Mural Lighting")
