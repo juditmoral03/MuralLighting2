@@ -1,21 +1,21 @@
 #!/bin/bash
 
-# 1. Reemplazar puerto en Nginx
+# 1. Replace port in Nginx
 sed -i "s/listen 10000;/listen $PORT;/g" /etc/nginx/nginx.conf
 
-# 2. Iniciar Node (WebApp)
-echo "Iniciando Node..."
+# 2. Start Node (WebApp)
+echo "Starting Node..."
 cd webapp && PORT=3006 npm start &
 
-# 3. Iniciar NiceGUI (Menu)
-echo "Iniciando NiceGUI..."
+# 3. Start NiceGUI (Menu)
+echo "Starting NiceGUI..."
 cd menu && python3 main.py &
 
-# 4. --- EL CAMBIO ESTÁ AQUÍ ---
-echo "Esperando a que Python y Node arranquen..."
-# Aumentamos de 5 a 15 segundos para asegurar que NiceGUI esté listo
+# 4. --- THE CHANGE IS HERE ---
+echo "Waiting for Python and Node to start..."
+# Increased from 5 to 15 seconds to ensure NiceGUI is ready
 sleep 15 
 
-# 5. Iniciar Nginx
-echo "Iniciando Nginx..."
+# 5. Start Nginx
+echo "Starting Nginx..."
 nginx -g 'daemon off;'

@@ -32,42 +32,41 @@ var rightView = new ImageView(containerR.clientWidth, containerR.clientHeight);
 containerR.appendChild(rightView.renderer.domElement);
 
 // Interactive frames
-// Interactive frames
 containerL.classList.add('image-frame', 'hidden');
 containerR.classList.add('image-frame', 'hidden');
 
-let selectedWindow = ''; // Inicialmente vacío
+let selectedWindow = ''; // Initially empty
 
-// CLICK EN VENTANA IZQUIERDA
+// LEFT WINDOW CLICK
 containerL.addEventListener('click', () => {
     if (selectedWindow === 'left') {
-        // Si ya estaba seleccionada, la deseleccionamos
-        containerL.classList.add('hidden'); // Ocultamos borde
-        selectedWindow = ''; // Estado vacío
+        // If already selected, deselect it
+        containerL.classList.add('hidden'); // Hide border
+        selectedWindow = ''; // Empty state
         localStorage.removeItem('selectedWindow'); 
-        //notifyPython(null); // Enviamos null a Python
+        //notifyPython(null); // Send null to Python
     } else {
-        // Si NO estaba seleccionada, la activamos (y desactivamos la otra)
-        containerL.classList.remove('hidden'); // Mostramos borde
-        containerR.classList.add('hidden');    // Ocultamos borde derecha
+        // If NOT selected, activate it (and deactivate the other)
+        containerL.classList.remove('hidden'); // Show border
+        containerR.classList.add('hidden');    // Hide right border
         selectedWindow = 'left';
         localStorage.setItem('selectedWindow', selectedWindow); 
         //notifyPython('left'); 
     }
 });
 
-// CLICK EN VENTANA DERECHA
+// RIGHT WINDOW CLICK
 containerR.addEventListener('click', () => {
     if (selectedWindow === 'right') {
-        // Si ya estaba seleccionada, la deseleccionamos
-        containerR.classList.add('hidden'); // Ocultamos borde
-        selectedWindow = ''; // Estado vacío
+        // If already selected, deselect it
+        containerR.classList.add('hidden'); // Hide border
+        selectedWindow = ''; // Empty state
         localStorage.removeItem('selectedWindow');
         //notifyPython(null);
     } else {
-        // Si NO estaba seleccionada, la activamos (y desactivamos la otra)
-        containerR.classList.remove('hidden'); // Mostramos borde
-        containerL.classList.add('hidden');    // Ocultamos borde izquierda
+        // If NOT selected, activate it (and deactivate the other)
+        containerR.classList.remove('hidden'); // Show border
+        containerL.classList.add('hidden');    // Hide left border
         selectedWindow = 'right';
         localStorage.setItem('selectedWindow', selectedWindow); 
         //notifyPython('right');
@@ -122,94 +121,94 @@ leftView.renderer.toneMappingExposure = 1.0;
 ///// EXR & JPG Loading (PROGRESSIVE)
 
 const exrLoader = new EXRLoader();
-exrLoader.setDataType(THREE.FloatType); // --- CANVI: HalfFloat és més ràpid que Float
-const textureLoader = new THREE.TextureLoader(); // --- CANVI: Loader pels JPGs
+exrLoader.setDataType(THREE.FloatType); // --- CHANGE: HalfFloat is faster than Float
+const textureLoader = new THREE.TextureLoader(); // --- CHANGE: Loader for JPGs
 
 const TEXTURE_BASE_PATH = './textures/';
 
-// Variables d'estat per evitar que una càrrega antiga sobreescrigui una nova
+// State variables to prevent an old load from overwriting a new one
 let currentLeftFile = "";
 let currentRightFile = "";
 
 let leftRequestID = 0;
 let rightRequestID = 0;
 
-// Variables per saber si l'EXR ja ha guanyat la carrera
+// Variables to know if the EXR has already won the race
 let leftEXRLoaded = false;
 let rightEXRLoaded = false;
 
 let leftTimeout = null;
 let rightTimeout = null;
 
-// --- CANVI: Nova lògica de càrrega progressiva ---
+// --- CHANGE: New progressive loading logic ---
 function loadLeftImage(filename) {
     if (!filename) return;
     
-    // Cancel·lem la càrrega "Full" anterior si l'usuari canvia ràpid
+    // Cancel previous "Full" load if user changes quickly
     if (leftTimeout) clearTimeout(leftTimeout);
 
     leftRequestID++; 
     const myRequestID = leftRequestID; 
 
-    // Neteja del nom base (traiem .exr)
+    // Cleanup base name (remove .exr)
     let baseName = filename;
     if (baseName.toLowerCase().endsWith('.exr')) {
         baseName = baseName.substring(0, baseName.length - 4);
     }
 
-    // 1. CÀRREGA PREVIEW (_small.exr)
-    // Utilitzem exrLoader, però carreguem l'arxiu petit.
+    // 1. PREVIEW LOAD (_small.exr)
+    // We use exrLoader, but load the small file.
     const smallUrl = TEXTURE_BASE_PATH + baseName + '_small.exr';
     
-    // console.log(`🔍 [ID:${myRequestID}] Buscant preview: ${baseName}_small.exr`);
+    // console.log(`🔍 [ID:${myRequestID}] Looking for preview: ${baseName}_small.exr`);
 
     exrLoader.load(smallUrl, (texture) => {
-        // Només apliquem si l'usuari no ha canviat d'imatge
+        // Only apply if user hasn't changed image
         if (myRequestID === leftRequestID) {
-            // console.log("✅ Small EXR carregat (Esquerra)");
+            // console.log("✅ Small EXR loaded (Left)");
             updateLeftView(texture); 
         }
     }, undefined, (err) => {
-        // Si no existeix el _small, no passa res greu, esperarem al gran.
-        console.warn(`⚠️ No s'ha trobat ${baseName}_small.exr (Esquerra)`);
+        // If _small doesn't exist, it's fine, wait for the big one.
+        console.warn(`⚠️ ${baseName}_small.exr not found (Left)`);
     });
 
-    // 2. CÀRREGA FINAL (Original .exr)
-    // Esperem 200ms per no bloquejar la interfície si l'usuari passa el ratolí ràpid
+    // 2. FINAL LOAD (Original .exr)
+    // Wait 200ms to avoid blocking interface if user scrolls mouse quickly
     leftTimeout = setTimeout(() => {
         const fullUrl = TEXTURE_BASE_PATH + baseName + '.exr';
-        console.log(`🚀 [ID:${myRequestID}] Iniciant EXR Full (Background): ${baseName}`);
+        console.log(`🚀 [ID:${myRequestID}] Starting Full EXR (Background): ${baseName}`);
 
         exrLoader.load(fullUrl, (texture) => {
             if (myRequestID === leftRequestID) {
-                console.log(`✅ [ID:${myRequestID}] EXR Full carregat i aplicat.`);
+                console.log(`✅ [ID:${myRequestID}] Full EXR loaded and applied.`);
                 
-                // Opcional: Si vols assegurar-te que s'allibera la memòria del small:
+                // Optional: Ensure small memory is released:
                 if(leftView.texture) leftView.texture.dispose();
                 
                 updateLeftView(texture);
             } else {
-                texture.dispose(); // Si arriba tard, a la brossa
+                texture.dispose(); // If it arrives late, discard it
             }
         }, undefined, (err) => console.error("Error EXR Full Left:", err));
 
-    }, 200); // Retard de seguretat per fluïdesa del menú
+    }, 200); // Safety delay for menu fluidity
 }
 
 
-// --- CANVI: Aquesta funció fa la feina real d'actualitzar la vista (abans es deia loadLeftImage) ---
+// --- CHANGE: This function does the actual work of updating the view (previously called loadLeftImage) ---
 function updateLeftView(texture) {
     if (!texture) return;
 
-    // DETECCIÓ ROBUSTA:
-    // Els EXR carregats tenen tipus Float (1015) o HalfFloat (1016).
-    // Els JPG tenen tipus UnsignedByte (1009).
+    // ROBUST DETECTION:
+    // Loaded EXRs have type Float (1015) or HalfFloat (1016).
+    // JPGs have type UnsignedByte (1009).
     const isHDR = (texture.type === THREE.FloatType || texture.type === THREE.HalfFloatType);
 
-    // Cridem a loadImage passant el flag isHDR
+    // Call loadImage passing the isHDR flag
     leftView.loadImage(texture, isHDR);
 
-    // Si és JPG, forcem manualment els uniforms per si imageView.js no ho ha fet
+    // If JPG, manually force uniforms in case imageView.js didn't do it
     if (!isHDR) {
         leftView.scene.traverse((object) => {
             if (object.isMesh && object.material) {
@@ -222,22 +221,22 @@ function updateLeftView(texture) {
 
     applyStoredSelection();
 
-    // Sincronització normalització (només si els dos són HDR realment)
+    // Normalization sync (only if both are truly HDR)
     if (params.fixNormalization && isHDR) {
         leftView.maxInputLuminance = rightView.maxInputLuminance;
         leftView.avgInputLuminance = rightView.avgInputLuminance;
         leftView.logAvgInputLuminance = rightView.logAvgInputLuminance;
     }
 
-    // Actualitzar finestra diferència
+    // Update difference window
     difWin.leftTexture = texture;
-    difWin.uMaxLum = leftView.avgInputLuminance || 1.0; // Evita valors nuls
+    difWin.uMaxLum = leftView.avgInputLuminance || 1.0; // Avoid null values
     recomputeDiff = true;
 
     render(leftView);
 }
 
-// --- CANVI: Mateixa lògica per la dreta ---
+// --- CHANGE: Same logic for the right ---
 function loadRightImage(filename) {
     if (!filename) return;
 
@@ -256,21 +255,21 @@ function loadRightImage(filename) {
     
     exrLoader.load(smallUrl, (texture) => {
         if (myRequestID === rightRequestID) {
-            // console.log("✅ Small EXR carregat (Dreta)");
+            // console.log("✅ Small EXR loaded (Right)");
             updateRightView(texture);
         }
     }, undefined, (err) => {
-        console.warn(`⚠️ No s'ha trobat ${baseName}_small.exr (Dreta)`);
+        console.warn(`⚠️ ${baseName}_small.exr not found (Right)`);
     });
 
     // 2. FULL (.exr)
     rightTimeout = setTimeout(() => {
         const fullUrl = TEXTURE_BASE_PATH + baseName + '.exr';
-        console.log(`🚀 [ID:${myRequestID}] Iniciant EXR Full Dreta...`);
+        console.log(`🚀 [ID:${myRequestID}] Starting Full EXR Right...`);
 
         exrLoader.load(fullUrl, (texture) => {
             if (myRequestID === rightRequestID) {
-                console.log(`✅ [ID:${myRequestID}] EXR Full Dreta carregat.`);
+                console.log(`✅ [ID:${myRequestID}] Full EXR Right loaded.`);
                 
                 if(rightView.texture) rightView.texture.dispose();
                 
@@ -304,7 +303,7 @@ function updateRightView(texture) {
     recomputeDiff = true;
     
     if (params.fixNormalization && leftView.texture) {
-        // Forcem un render de l'esquerra per actualitzar valors
+        // Force a render of the left view to update values
         render(leftView);
     }
 
@@ -327,7 +326,7 @@ function loadImagesFromUrlParams() {
     const { img1, img2 } = getQueryParams();
 
     if (img1 && img2) {
-        console.log("📥 Cargando desde URL (Python):", img1, img2);
+        console.log("📥 Loading from URL (Python):", img1, img2);
         
         params.leftImage = img1;
         params.rightImage = img2;
@@ -336,7 +335,7 @@ function loadImagesFromUrlParams() {
             leftImageMenu.setValue(img1);   
             rightImageMenu.setValue(img2);  
         } else {
-            // --- CANVI: Ara cridem loadLeftImage amb el NOM (string), no amb el loader
+            // --- CHANGE: Now we call loadLeftImage with the NAME (string), not the loader
             loadLeftImage(img1);
             loadRightImage(img2);
         }
@@ -358,13 +357,6 @@ const params = {
 };
 
 
-
-
-
-
-
-
-
 ///// Input images
 
 let leftImageMenu, rightImageMenu;
@@ -372,21 +364,21 @@ let images = [];
 
 fetch('/app/images')
     .then(response => {
-        if (!response.ok) throw new Error("No se pudo cargar la lista de imágenes");
+        if (!response.ok) throw new Error("Could not load image list");
         return response.json();
     })
     .then(files => {
         images = files;
 
-        // --- CANVI: Ara el onChange crida la nostra funció wrapper amb el nom de l'arxiu ---
+        // --- CHANGE: Now onChange calls our wrapper function with the filename ---
         leftImageMenu = gui.add(params, 'leftImage', images).name('Left Image').onChange((value) => {
-            console.log("Cambio manual Left:", value);
-            loadLeftImage(value); // Passem el string
+            console.log("Manual Change Left:", value);
+            loadLeftImage(value); // Pass string
         });
         
         rightImageMenu = gui.add(params, 'rightImage', images).name('Right Image').onChange((value) => {
-            console.log("Cambio manual Right:", value);
-            loadRightImage(value); // Passem el string
+            console.log("Manual Change Right:", value);
+            loadRightImage(value); // Pass string
         });
 
         leftImageMenu.domElement.closest('.controller')?.style.setProperty('display', 'none');
@@ -404,7 +396,7 @@ fetch('/app/images')
         }
     })
     .catch(error => {
-        console.warn('⚠️ Error cargando menú fetch.', error);
+        console.warn('⚠️ Error loading fetch menu.', error);
         loadImagesFromUrlParams();
     });
 
@@ -554,26 +546,20 @@ function updateDiffParams() {
     difWin.updateDiffParams(params.maxDiff, params.imgOverlay);
 }
 
-// Funció per enviar la selecció a Python
-// Funció per enviar la selecció a Python
+// Function to send selection to Python
 async function notifyPython(selection) {
     
-    // --- CORRECCIÓN IMPORTANTE ---
-    // En local, el JS vive en el puerto 3006 y Python en el 8080.
-    // Debemos poner la URL completa de Python.
-    // Si estás en producción (Render), probablemente ambos estén bajo el mismo dominio, 
-    // así que podrías necesitar una comprobación.
     
     let url;
     if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
-        // Modo LOCAL: Apuntamos al puerto de NiceGUI (8080)
+        // LOCAL Mode: Point to NiceGUI port (8080)
         url = 'http://127.0.0.1:8080/set_selected_window';
     } else {
-        // Modo PRODUCCIÓN: Asumimos que están en el mismo dominio
+        // PRODUCTION Mode: Assume same domain
         url = '/set_selected_window';
     }
 
-    // console.log(`📡 Enviant selecció '${selection}' a: ${url}`);
+    // console.log(`📡 Sending selection '${selection}' to: ${url}`);
 
     try {
         const response = await fetch(url, {
@@ -587,7 +573,7 @@ async function notifyPython(selection) {
         if (!response.ok) throw new Error(response.status);
 
     } catch (error) {
-        console.warn("⚠️ Error conectando con Python:", error);
+        console.warn("⚠️ Error connecting to Python:", error);
     }
 }
 
@@ -596,28 +582,28 @@ window.loadLeftImage = loadLeftImage;
 window.loadRightImage = loadRightImage;
 
 
-// Escuchar mensajes desde el padre (Python/NiceGUI en puerto 8080)
+// Listen for messages from parent (Python/NiceGUI on port 8080)
 window.addEventListener('message', function(event) {
-    // Es buena práctica verificar el origen, pero en local podemos saltarlo o confiar.
+    // Good practice to verify origin, but locally we can skip or trust.
     const data = event.data;
 
     if (data.type === 'change_left') {
-        console.log("📨 Recibida orden cambiar Izquierda:", data.path);
+        console.log("📨 Received command change Left:", data.path);
         loadLeftImage(data.path);
     } 
     else if (data.type === 'change_right') {
-        console.log("📨 Recibida orden cambiar Derecha:", data.path);
+        console.log("📨 Received command change Right:", data.path);
         loadRightImage(data.path);
     }
 
-    // --- NUEVO CÓDIGO PARA SYNC ---
+    // --- NEW CODE FOR SYNC ---
     if (data.type === 'toggle_sync') {
-        console.log("🔄 Sync cambiado a:", data.value);
+        console.log("🔄 Sync changed to:", data.value);
         
-        // 1. Actualizar la variable lógica
+        // 1. Update logic variable
         params.syncViews = data.value;
 
-        // 2. Actualizar visualmente el checkbox del panel derecho (lil-gui)
+        // 2. Visually update checkbox in right panel (lil-gui)
         if (gui && gui.controllers) {
             gui.controllers.forEach(controller => {
                 if (controller.property === 'syncViews') {
@@ -626,10 +612,10 @@ window.addEventListener('message', function(event) {
             });
         }
         
-        // 3. Forzar resincronización inmediata al activar
+        // 3. Force immediate resync when activating
         if (data.value === true) {
             syncing = false; 
-            // Copiamos la cámara Izquierda a la Derecha
+            // Copy Left camera to Right
             rightView.camera.position.copy(leftView.camera.position);
             rightView.camera.quaternion.copy(leftView.camera.quaternion);
             rightView.camera.zoom = leftView.camera.zoom;
@@ -637,13 +623,13 @@ window.addEventListener('message', function(event) {
         }
     }
 
-    // --- BLOQUE TONE MAPPING (SOLUCIÓN DEFINITIVA V2) ---
+    // --- TONE MAPPING BLOCK (DEFINITIVE SOLUTION V2) ---
     if (data.type === 'tm_update') {
         
         // 1. Target
         if (data.target) params.selectedTarget = data.target;
 
-        // 2. Mapeo
+        // 2. Mapping
         const algoMap = {
             "toneMappingLinear": toneMappingMethods[0],
             "toneMappingReinhardBasic": toneMappingMethods[1],
@@ -657,7 +643,7 @@ window.addEventListener('message', function(event) {
             params.toneMappingMethodName = methodObj.name;
             if (typeof updateFolders === 'function') updateFolders(methodObj.name);
 
-            // --- APLICACIÓN DE PARÁMETROS ROBUSTA ---
+            // --- ROBUST PARAMETER APPLICATION ---
             
             // A) EXPOSURE (Linear, Basic)
             if (methodObj.parameters.exposure) {
@@ -679,18 +665,18 @@ window.addEventListener('message', function(event) {
                 else if (methodObj.parameters.L_white) methodObj.parameters.L_white.value = data.white;
             }
 
-            // C) LUMINANCE (Max Lum) - AQUÍ ESTÁ EL ARREGLO
+            // C) LUMINANCE (Max Lum) - HERE IS THE FIX
             if (data.algo === "toneMappingLuminance") {
                 const paramKeys = Object.keys(methodObj.parameters);
                 
                 if (paramKeys.length > 0) {
-                    // TRUCO: Cogemos el primer parámetro que tenga el shader, se llame como se llame.
-                    // Esto arregla el error de nombres desconocidos.
+                    // TRICK: Pick the first parameter the shader has, whatever it's called.
+                    // This fixes unknown name errors.
                     const realName = paramKeys[0]; 
-                    console.log("🔗 Conectando slider a:", realName);
+                    console.log("🔗 Connecting slider to:", realName);
                     methodObj.parameters[realName].value = data.maxLum;
                 } else {
-                    console.warn("⚠️ No se encontraron parámetros en toneMappingLuminance");
+                    console.warn("⚠️ No parameters found in toneMappingLuminance");
                 }
             }
         }
@@ -701,10 +687,10 @@ window.addEventListener('message', function(event) {
     }
 
 
-    // --- BLOQUE IMAGE DIFFERENCE ---
+    // --- IMAGE DIFFERENCE BLOCK ---
     if (data.type === 'open_diff') {
         console.log("🔘 Opening Difference Dialog from Menu");
-        // Llamamos a la función global openDialog() que ya tienes definida en client.js
+        // Call global function openDialog() defined in client.js
         if (typeof openDialog === 'function') {
             openDialog();
         }
@@ -712,70 +698,67 @@ window.addEventListener('message', function(event) {
 
 
     // =========================================================
-//  LÓGICA DE CONTROLES HTML (Diferencia de Imágenes)
-// =========================================================
+    //  HTML CONTROLS LOGIC (Image Difference)
+    // =========================================================
 
-// 1. Referencias a los elementos del DOM (Sliders en index.html)
-const sliderDiff = document.getElementById('slider_maxDiff');
-const sliderOver = document.getElementById('slider_overlay');
-const labelDiff  = document.getElementById('val_maxDiff');
-const labelOver  = document.getElementById('val_overlay');
+    // 1. References to DOM elements (Sliders in index.html)
+    const sliderDiff = document.getElementById('slider_maxDiff');
+    const sliderOver = document.getElementById('slider_overlay');
+    const labelDiff  = document.getElementById('val_maxDiff');
+    const labelOver  = document.getElementById('val_overlay');
 
-// 2. Activar listeners si existen los elementos
-if (sliderDiff && sliderOver) {
-    // Escuchar cambios en Max Difference
-    sliderDiff.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        params.maxDiff = val;
-        labelDiff.textContent = val.toFixed(3); 
-        updateDiffParams(); 
-    });
+    // 2. Activate listeners if elements exist
+    if (sliderDiff && sliderOver) {
+        // Listen for changes in Max Difference
+        sliderDiff.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            params.maxDiff = val;
+            labelDiff.textContent = val.toFixed(3); 
+            updateDiffParams(); 
+        });
 
-    // Escuchar cambios en Image Overlay
-    sliderOver.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        params.imgOverlay = val;
-        labelOver.textContent = val.toFixed(2); 
-        updateDiffParams(); 
-    });
-}
+        // Listen for changes in Image Overlay
+        sliderOver.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            params.imgOverlay = val;
+            labelOver.textContent = val.toFixed(2); 
+            updateDiffParams(); 
+        });
+    }
 
-// =========================================================
-//  LISTENER DE MENSAJES (Python -> JS)
-// =========================================================
+    // =========================================================
+    //  MESSAGE LISTENER (Python -> JS)
+    // =========================================================
 
-window.addEventListener('message', function(event) {
-    const data = event.data;
+    window.addEventListener('message', function(event) {
+        const data = event.data;
 
-    // --- (Aquí van tus otros ifs: change_left, tm_update, sync, etc.) ---
-    // Asegúrate de MANTENER los bloques anteriores de tone mapping, sync, etc.
-    // Solo reemplaza o añade la parte de 'toggle_diff' abajo.
-
-    if (data.type === 'change_left') { loadLeftImage(data.path); }
-    if (data.type === 'change_right') { loadRightImage(data.path); }
-    
-    // ... Tu bloque de toggle_sync ...
-    // ... Tu bloque de tm_update ...
-
-
-    // --- BLOQUE IMAGE DIFFERENCE (TOGGLE ARREGLADO) ---
-    if (data.type === 'toggle_diff') {
-        console.log("🔘 Toggle Difference Window");
         
-        const dialog = document.getElementById('differenceDialog');
-        if (dialog) {
-            // USAMOS getComputedStyle: La forma robusta de saber si está visible
-            const style = window.getComputedStyle(dialog);
+
+        if (data.type === 'change_left') { loadLeftImage(data.path); }
+        if (data.type === 'change_right') { loadRightImage(data.path); }
+        
+        
+
+
+        // --- IMAGE DIFFERENCE BLOCK (TOGGLE FIXED) ---
+        if (data.type === 'toggle_diff') {
+            console.log("🔘 Toggle Difference Window");
             
-            if (style.display === 'none') {
-                // Si está oculto -> Abrir
-                if (typeof openDialog === 'function') openDialog();
-            } else {
-                // Si está visible (flex, block, etc) -> Cerrar
-                if (typeof closeDialog === 'function') closeDialog();
+            const dialog = document.getElementById('differenceDialog');
+            if (dialog) {
+                // WE USE getComputedStyle: The robust way to know if it's visible
+                const style = window.getComputedStyle(dialog);
+                
+                if (style.display === 'none') {
+                    // If hidden -> Open
+                    if (typeof openDialog === 'function') openDialog();
+                } else {
+                    // If visible (flex, block, etc) -> Close
+                    if (typeof closeDialog === 'function') closeDialog();
+                }
             }
         }
-    }
-});
+    });
 
 });

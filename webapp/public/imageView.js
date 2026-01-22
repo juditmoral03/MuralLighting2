@@ -38,11 +38,11 @@ class ImageView {
         this.texture = null;
     }
 
-    // ⚠️ CANVI IMPORTANT: Afegim el paràmetre 'isHDR'
+   
     loadImage(texture, isHDR = true, log_properties = false) {
         console.log(`Loading texture... (Is HDR: ${isHDR})`);
 
-        // Netejem l'escena anterior (evita que es barregin JPG i EXR)
+        
         while(this.scene.children.length > 0){ 
             const object = this.scene.children[0];
             if (object.geometry) object.geometry.dispose();
@@ -55,7 +55,7 @@ class ImageView {
         const t_height = texture.image.height;
         const aspectRatio = t_width / t_height;
     
-        // ⚠️ CANVI VITAL: Només analitzem si és HDR. Si és JPG, ens ho saltem.
+        
         if (isHDR) {
             const {r, g, b, L} = analyzeTexture(texture); 
             this.maxInputLuminance = Math.max(r.max, g.max, b.max);
@@ -66,13 +66,13 @@ class ImageView {
                 console.log('Texture properties:', L.max);
             }
         } else {
-            // Valors segurs per defecte per JPG
+            
             this.maxInputLuminance = 1.0;
             this.avgInputLuminance = 0.5;
             this.logAvgInputLuminance = 0.5;
         }
         
-        // Creem el material
+        
         this.material = new THREE.ShaderMaterial({
             uniforms: {
                 uTexture: { type: 't', value: texture }, 

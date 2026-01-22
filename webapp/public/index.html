@@ -18,29 +18,29 @@
             height: 100vh;
         }
 
-        /* --- ESTILOS DIÁLOGO --- */
+        /* --- DIALOG STYLES --- */
         .dialog {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0); /* Fondo transparente para click-through si quieres */
+            background-color: rgba(0, 0, 0, 0); /* Transparent background for click-through if desired */
             justify-content: center; align-items: center;
-            pointer-events: none; /* Permitir clicks fuera */
+            pointer-events: none; /* Allow clicks outside */
             z-index: 1000;
         }
 
         .dialog-content {
-            background-color: #222; /* Fondo oscuro más profesional */
+            background-color: #222; /* Darker, more professional background */
             color: white;
             border-radius: 8px;
             box-shadow: 0px 10px 25px rgba(0, 0, 0, 0.8);
-            width: 40%; height: 80%; /* Ajuste de tamaño */
+            width: 40%; height: 80%; /* Size adjustment */
             max-width: 90%; max-height: 90%;
             position: relative;
             z-index: 1001;
             pointer-events: all;
             
-            /* FLEXBOX PARA ORGANIZAR: CABECERA - VISOR - CONTROLES */
+            /* FLEXBOX TO ORGANIZE: HEADER - VIEWER - CONTROLS */
             display: flex;
             flex-direction: column;
             border: 1px solid #444;
@@ -55,7 +55,7 @@
             font-weight: bold;
             text-align: center;
             border-bottom: 1px solid #444;
-            flex-shrink: 0; /* No encoger */
+            flex-shrink: 0; /* Do not shrink */
         }
 
         .close-button {
@@ -64,15 +64,15 @@
         }
         .close-button:hover { color: white; }
 
-        /* VISOR 3D DENTRO DEL DIÁLOGO */
+        /* 3D VIEWER INSIDE THE DIALOG */
         #winDiff {
             width: 100%;
-            flex-grow: 1; /* Ocupa todo el espacio disponible */
+            flex-grow: 1; /* Occupies all available space */
             background: #000;
             position: relative;
         }
 
-        /* --- NUEVA ÁREA DE CONTROLES (SLIDERS) --- */
+        /* --- NEW CONTROLS AREA (SLIDERS) --- */
         .controls-area {
             padding: 15px;
             background: #2a2a2a;
@@ -82,7 +82,7 @@
             display: flex;
             gap: 20px;
             justify-content: space-around;
-            flex-shrink: 0; /* No encoger */
+            flex-shrink: 0; /* Do not shrink */
         }
 
         .control-group {
@@ -97,7 +97,7 @@
             width: 100%; cursor: pointer;
         }
 
-        /* Bordes de selección */
+        /* Selection borders */
         .image-frame {
             border: 5px solid transparent;
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -149,11 +149,13 @@
         window.addEventListener('DOMContentLoaded', () => {
             const containerL = document.getElementById('window1');
             const containerR = document.getElementById('window2');
+            
             function updateVisualSelection(selected) {
                 containerL.classList.remove('selected'); containerR.classList.remove('selected');
                 if (selected === 'left') containerL.classList.add('selected');
                 else if (selected === 'right') containerR.classList.add('selected');
             }
+
             function handleSelection(clickedWindow) {
                 const current = localStorage.getItem('selectedWindow');
                 let final = (current === clickedWindow) ? null : clickedWindow;
@@ -162,6 +164,7 @@
                 updateVisualSelection(final);
                 window.parent.postMessage({ type: 'window_selected', value: final }, '*');
             }
+
             const saved = localStorage.getItem('selectedWindow');
             if (saved) updateVisualSelection(saved);
             containerL.addEventListener('click', () => handleSelection('left'));
