@@ -4,6 +4,7 @@ from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import datetime
+import uuid  # <--- NEW: To generate unique session IDs
 
 # --- CONFIGURATION & ENVIRONMENT SETUP ---
 IS_PRODUCTION = os.environ.get('RENDER') is not None
@@ -23,9 +24,10 @@ app.add_static_files('/menu', menu_path)
 LOG_FILE = "visit_log.json"
 INTERACTIONS_FILE = "interactions.json"
 
-def log_visitor(request: Request):
+def log_visitor(request: Request, session_id: str):
     """
-    Logs visitor IP, Timestamp, and User Agent to a JSON file.
+    Logs visitor IP, Session ID, Timestamp, and User Agent to a JSON file.
+    Uses Session ID to differentiate users on the same Wifi.
     """
     # 1. Get Real IP (Handle Render Proxy)
     forwarded = request.headers.get("X-Forwarded-For")
@@ -38,6 +40,7 @@ def log_visitor(request: Request):
     visit_data = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "ip": client_ip,
+        "session_id": session_id,  # <--- NEW: Log the Unique ID
         "user_agent": request.headers.get("user-agent", "Unknown")
     }
 
@@ -50,11 +53,21 @@ def log_visitor(request: Request):
         except:
             logs = []
 
-    # 4. Debounce (prevent duplicates within 5 seconds)
+    # 4. Debounce (prevent duplicates within 5 seconds based on SESSION ID)
     should_log = True
     if logs:
         last_visit = logs[-1]
-        if last_visit['ip'] == client_ip:
+        # Check if it is the same session ID (same user browser)
+        last_session = last_visit.get('session_id')
+        
+        # If session_id matches, check time. If old log didn't have session_id, check IP.
+        same_user = False
+        if last_session and last_session == session_id:
+            same_user = True
+        elif not last_session and last_visit['ip'] == client_ip:
+            same_user = True
+
+        if same_user:
             last_time = datetime.datetime.strptime(last_visit['timestamp'], "%Y-%m-%d %H:%M:%S")
             now_time = datetime.datetime.strptime(visit_data['timestamp'], "%Y-%m-%d %H:%M:%S")
             if (now_time - last_time).total_seconds() < 5:
@@ -68,9 +81,9 @@ def log_visitor(request: Request):
             
     return len(logs)
 
-def log_interaction(request: Request, action: str, detail: str):
+def log_interaction(request: Request, action: str, detail: str, session_id: str = "Unknown"):
     """
-    Logs a specific user action (Button click, Filter change, etc.)
+    Logs a specific user action with their Session ID.
     """
     forwarded = request.headers.get("X-Forwarded-For")
     client_ip = forwarded.split(",")[0] if forwarded else (request.client.host if request.client else "Unknown")
@@ -78,6 +91,7 @@ def log_interaction(request: Request, action: str, detail: str):
     event_data = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "ip": client_ip,
+        "session_id": session_id, # <--- NEW: Log the Unique ID
         "action": action,
         "detail": detail
     }
@@ -109,8 +123,16 @@ DEFAULT_IMAGE2 = "XII/Artificial/C2-pv2.exr"
 @ui.page('/')
 async def main(request: Request):
 
-    total_visits = log_visitor(request)
-    print(f"New visit logged. Total: {total_visits}")
+    # --- 0. UNIQUE USER IDENTIFICATION ---
+    # Check if the user already has a Unique ID in their browser storage
+    if 'user_uid' not in app.storage.browser:
+        app.storage.browser['user_uid'] = str(uuid.uuid4())
+    
+    # Retrieve the session ID
+    session_id = app.storage.browser['user_uid']
+
+    total_visits = log_visitor(request, session_id)
+    print(f"New visit logged. Total: {total_visits}. Session: {session_id}")
 
     # --- 1. SESSION STATE ---
     class SessionState:
@@ -216,7 +238,8 @@ async def main(request: Request):
                 state.all_cards[image].append(button)
                 
                 async def toggle_selection():
-                    log_interaction(request, "Select Image", str(text))
+                    # Pass session_id to log_interaction
+                    log_interaction(request, "Select Image", str(text), session_id)
                     selected_window = await ui.run_javascript('return localStorage.getItem("selectedWindow");')
                     
                     if not selected_window or selected_window == "none" or selected_window == "null": 
@@ -571,13 +594,14 @@ async def main(request: Request):
     with ui.column().classes('absolute-full gap-0 no-wrap'):
 
         # --- HIDDEN BUTTONS FOR LOGGING (BRIDGE JS -> PYTHON) ---
-        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Left View")) \
+        # UPDATED: Pass session_id to the lambda
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Left View", session_id)) \
             .props('id=log-btn-left').style('display: none')
         
-        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Right View")) \
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Right View", session_id)) \
             .props('id=log-btn-right').style('display: none')
         
-        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Deselected (None)")) \
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Deselected (None)", session_id)) \
             .props('id=log-btn-none').style('display: none')
 
         # --- MENU ROW (TOP BAR) ---
@@ -589,7 +613,7 @@ async def main(request: Request):
                 sync_state = {'active': True}
                 async def toggle_sync():
                     sync_state['active'] = not sync_state['active']
-                    log_interaction(request, "Tool Sync", "On" if sync_state['active'] else "Off")
+                    log_interaction(request, "Tool Sync", "On" if sync_state['active'] else "Off", session_id)
                     if sync_state['active']: icon_sync.classes('text-black', remove='text-gray-300')
                     else: icon_sync.classes('text-gray-300', remove='text-black')
                     
@@ -638,7 +662,7 @@ async def main(request: Request):
                     ''')
 
                 def log_tm_selection(category, value):
-                    log_interaction(request, "Tone Mapping Tool", f"{category}: {value}")
+                    log_interaction(request, "Tone Mapping Tool", f"{category}: {value}", session_id)
 
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     ui.icon('tune', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined')
@@ -704,7 +728,7 @@ async def main(request: Request):
                     
                 # C) IMAGE DIFFERENCE TOOL
                 async def open_diff_js():
-                    log_interaction(request, "Tool Difference", "Clicked")
+                    log_interaction(request, "Tool Difference", "Clicked", session_id)
                     await ui.run_javascript('''
                         var iframe = document.getElementById("viewer-iframe");
                         if(iframe) {
@@ -739,7 +763,7 @@ async def main(request: Request):
                     if cat == "Home": 
                         ui.icon('info', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined') \
                             .on('mouseover', lambda e, cat=cat: show_panel(e, cat)) \
-                            .on('click', lambda: [log_interaction(request, "Open Info", "Home Icon"), home_dialog.open()]) 
+                            .on('click', lambda: [log_interaction(request, "Open Info", "Home Icon", session_id), home_dialog.open()]) 
                     elif cat == "Natural illumination": 
                         ui.icon('sunny', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
                     elif cat == "Artificial illumination": 
@@ -763,7 +787,7 @@ async def main(request: Request):
                     with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as hour_menu:
                         ui.label("Global Hour").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
                         def set_global_hour_fn(h):
-                            log_interaction(request, "Filter Hour", h)
+                            log_interaction(request, "Filter Hour", h, session_id)
                             state.hour = h; ui.run_javascript(f'localStorage.setItem("global_hour", "{h}")')
                             if h == "All": icon_hour.set_visibility(True); label_hour.set_visibility(False)
                             else: icon_hour.set_visibility(False); label_hour.set_text(h); label_hour.set_visibility(True)
@@ -781,7 +805,7 @@ async def main(request: Request):
                     with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as day_menu:
                         ui.label("Global Day").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
                         def set_global_day_fn(d):
-                            log_interaction(request, "Filter Day", d)
+                            log_interaction(request, "Filter Day", d, session_id)
                             state.day = d; ui.run_javascript(f'localStorage.setItem("global_day", "{d}")')
                             if d == "All": icon_day.set_visibility(True); label_day.set_visibility(False)
                             else: icon_day.set_visibility(False); label_day.set_text(d); label_day.set_visibility(True)
@@ -890,87 +914,93 @@ async def main(request: Request):
             .props('id=container')
 
 
-# --- STATS PAGE ---
+# --- UPDATED STATS PAGE ---
 @ui.page('/stats')
 def stats_page():
     
-    # 1. LOAD INTERACTIONS (IN MEMORY)
-    interactions_by_ip = {}
+    # 1. LOAD AND STRUCTURE DATA
+    # Structure: ip -> session_id -> list of events
+    interactions_by_ip_session = {}
+    
     if os.path.exists(INTERACTIONS_FILE):
         try:
             with open(INTERACTIONS_FILE, "r") as f:
                 raw_events = json.load(f)
             
             from collections import defaultdict
-            temp_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+            # Create nested dictionary: data[ip][session_id] = [events]
+            temp_data = defaultdict(lambda: defaultdict(list))
             
             for e in raw_events:
                 ip = e.get('ip', 'Unknown')
-                action = e.get('action', 'Other')
-                detail = e.get('detail', '-')
-                temp_stats[ip][action][detail] += 1
+                session = e.get('session_id', 'Unknown')
+                temp_data[ip][session].append(e)
             
-            # Convert to list for table
-            for ip, actions in temp_stats.items():
-                rows = []
-                for action, details in actions.items():
-                    for detail_name, count in details.items():
-                        rows.append({"action": action, "detail": detail_name, "count": count})
-                interactions_by_ip[ip] = rows
-        except Exception:
-            interactions_by_ip = {}
+            interactions_by_ip_session = temp_data
+            
+        except Exception as e:
+            print(f"Error loading stats: {e}")
+            interactions_by_ip_session = {}
 
-    # 2. RESET FUNCTION
     def reset_stats():
         if os.path.exists(LOG_FILE): os.remove(LOG_FILE)
         if os.path.exists(INTERACTIONS_FILE): os.remove(INTERACTIONS_FILE)
         ui.notify('🧹 All data has been cleared.', color='positive')
         ui.timer(1.0, lambda: ui.open('/stats'), once=True)
 
-    # 3. INTERFACE: HEADER
     with ui.row().classes('w-full justify-between items-center mb-6'):
         ui.label('User Analytics').classes('text-2xl font-bold')
         ui.button('Reset Data', on_click=reset_stats, icon='delete_forever').props('color=red outline')
 
-    ui.label('Click on a row to see details for that IP below the table.').classes('text-sm text-gray-500 mb-2')
+    ui.label('Click on an IP to see specific devices/users connected to it.').classes('text-sm text-gray-500 mb-2')
 
-    # 4. INTERFACE: MAIN TABLE (VISIT SUMMARY)
+    # 4. MAIN TABLE (VISIT SUMMARY BY IP)
     main_table = None 
+    
+    # Pre-calculation for session specifics
+    from collections import defaultdict
+    session_visit_stats = defaultdict(lambda: {'count': 0, 'last_seen': '-'})
 
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as f:
             visit_data = json.load(f)
         
-        # Group visits by IP
         ip_summary = {}
         for visit in visit_data:
             ip = visit.get('ip', 'Unknown')
             timestamp = visit.get('timestamp', '-')
-            if ip not in ip_summary: ip_summary[ip] = {'count': 0, 'last_seen': timestamp}
+            session = visit.get('session_id', 'Unknown')
+            
+            # Global IP aggregation
+            if ip not in ip_summary: 
+                ip_summary[ip] = {'count': 0, 'last_seen': timestamp, 'sessions': set()}
             ip_summary[ip]['count'] += 1
             ip_summary[ip]['last_seen'] = timestamp
+            ip_summary[ip]['sessions'].add(session)
 
-        summary_rows = [{'ip': ip, 'count': d['count'], 'last_seen': d['last_seen']} for ip, d in ip_summary.items()]
+            # Specific Session Aggregation (NEW)
+            session_visit_stats[session]['count'] += 1
+            # Assuming chronological order, update last seen
+            session_visit_stats[session]['last_seen'] = timestamp
+
+        summary_rows = [{'ip': ip, 'count': d['count'], 'last_seen': d['last_seen'], 'unique_users': len(d['sessions'])} for ip, d in ip_summary.items()]
         summary_rows.sort(key=lambda x: x['count'], reverse=True)
 
-        # DRAW TABLE
         main_table = ui.table(
             columns=[
-                {'name': 'ip', 'label': 'IP Address (Click to view)', 'field': 'ip', 'align': 'left', 'classes': 'font-bold text-blue-900'},
-                {'name': 'count', 'label': 'Total Visits', 'field': 'count', 'align': 'center', 'sortable': True},
+                {'name': 'ip', 'label': 'IP Address', 'field': 'ip', 'align': 'left', 'classes': 'font-bold text-blue-900'},
+                {'name': 'count', 'label': 'Visits', 'field': 'count', 'align': 'center', 'sortable': True},
+                {'name': 'unique_users', 'label': 'Unique Devices', 'field': 'unique_users', 'align': 'center', 'sortable': True},
                 {'name': 'last_seen', 'label': 'Last Seen', 'field': 'last_seen', 'align': 'right', 'sortable': True}
             ],
-            rows=summary_rows, 
-            pagination=10
+            rows=summary_rows, pagination=10
         ).classes('w-full cursor-pointer hover:bg-gray-50 mb-8')
-        
     else:
         ui.label("No visit data found.").classes('text-gray-500 italic p-2')
 
-    # 5. DETAILS CONTAINER
     details_container = ui.column().classes('w-full transition-all')
 
-    # 6. CLICK LOGIC
+    # 6. CLICK LOGIC (Show Sessions per IP)
     def show_ip_details(e):
         selected_ip = e.args[1]['ip'] if e.args[1] else None
         details_container.clear() 
@@ -979,33 +1009,70 @@ def stats_page():
 
         with details_container:
             ui.separator().classes('mb-4')
-            
             with ui.card().classes('w-full border-l-4 border-blue-500 shadow-lg bg-gray-50'):
                 with ui.row().classes('items-center justify-between w-full mb-4'):
-                    with ui.row().classes('items-center gap-2'):
-                        ui.icon('list_alt', size='md').classes('text-blue-600')
-                        ui.label(f"Interaction Details: {selected_ip}").classes('text-xl font-bold text-gray-800')
-                    
-                    ui.button('Close Details', on_click=details_container.clear, icon='close').props('flat color=red dense')
+                    ui.label(f"Devices on Network: {selected_ip}").classes('text-xl font-bold text-gray-800')
+                    ui.button('Close', on_click=details_container.clear, icon='close').props('flat color=red dense')
 
-                user_rows = interactions_by_ip.get(selected_ip, [])
+                sessions = interactions_by_ip_session.get(selected_ip, {})
                 
-                if user_rows:
-                    ui.table(
-                        columns=[
-                            {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left', 'sortable': True},
-                            {'name': 'detail', 'label': 'Detail', 'field': 'detail', 'align': 'left', 'sortable': True},
-                            {'name': 'count', 'label': 'Count', 'field': 'count', 'align': 'center', 'sortable': True}
-                        ],
-                        rows=user_rows,
-                        pagination=10
-                    ).classes('w-full bg-white')
-                else:
-                    ui.label("This IP visited the site but did not interact with any elements.").classes('text-orange-600 italic p-4')
+              
+                all_sessions_for_ip = [s for s, stats in session_visit_stats.items() if s in interactions_by_ip_session.get(selected_ip, {})]
+                
             
+                # Re-scan visits to find ALL sessions for this IP (Robust method)
+                sessions_found_for_ip = []
+                if os.path.exists(LOG_FILE):
+                     with open(LOG_FILE, "r") as f:
+                        v_data = json.load(f)
+                        for v in v_data:
+                            if v.get('ip') == selected_ip:
+                                sid = v.get('session_id')
+                                if sid and sid not in sessions_found_for_ip:
+                                    sessions_found_for_ip.append(sid)
+
+                if not sessions_found_for_ip:
+                    ui.label("No specific device sessions found.").classes('text-orange-600 italic p-4')
+                else:
+                    for session_id in sessions_found_for_ip:
+                        # Get specific stats
+                        s_stats = session_visit_stats.get(session_id, {'count': 0, 'last_seen': 'N/A'})
+                        visit_count = s_stats['count']
+                        last_seen_time = s_stats['last_seen']
+
+                        # Get interactions
+                        events = sessions.get(session_id, [])
+                        
+                        action_counts = defaultdict(lambda: defaultdict(int))
+                        for evt in events:
+                            action_counts[evt['action']][evt['detail']] += 1
+                        
+                        session_rows = []
+                        for act, details in action_counts.items():
+                            for det, count in details.items():
+                                session_rows.append({"action": act, "detail": det, "count": count})
+                        
+                        # UPDATED LABEL WITH VISITS AND LAST SEEN
+                        header_text = f"Device ID: {session_id[:8]}... | Visits: {visit_count} | Last Seen: {last_seen_time}"
+                        
+                        with ui.expansion(header_text, icon="smartphone").classes('w-full bg-white mb-2 border rounded'):
+                            ui.label(f"Full ID: {session_id}").classes('text-xs text-gray-400 mb-2 ml-2')
+                            if session_rows:
+                                ui.table(
+                                    columns=[
+                                        {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left'},
+                                        {'name': 'detail', 'label': 'Detail', 'field': 'detail', 'align': 'left'},
+                                        {'name': 'count', 'label': 'Count', 'field': 'count', 'align': 'center'}
+                                    ],
+                                    rows=session_rows, pagination=5
+                                ).classes('w-full')
+                            else:
+                                ui.label("Visited, but no specific interactions recorded.").classes('text-sm italic text-gray-500 ml-4 mb-2')
+
             ui.run_javascript('window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });')
 
     if main_table:
         main_table.on('rowClick', show_ip_details)
 
-ui.run(title="Mural Lighting")
+# IMPORTANT: Added storage_secret to enable browser storage
+ui.run(title="Mural Lighting", storage_secret='secret_key_change_this_to_something_random')

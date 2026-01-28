@@ -1,77 +1,38 @@
 [
     {
-        "timestamp": "2026-01-28 12:40:20",
+        "timestamp": "2026-01-28 20:25:40",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     },
     {
-        "timestamp": "2026-01-28 12:40:25",
+        "timestamp": "2026-01-28 20:26:18",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "392f0703-b6bd-4a10-b642-9bf027d61123",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     },
     {
-        "timestamp": "2026-01-28 12:44:10",
+        "timestamp": "2026-01-28 20:31:23",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "392f0703-b6bd-4a10-b642-9bf027d61123",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     },
     {
-        "timestamp": "2026-01-28 12:47:01",
+        "timestamp": "2026-01-28 20:31:24",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     },
     {
-        "timestamp": "2026-01-28 12:49:49",
+        "timestamp": "2026-01-28 20:32:28",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "392f0703-b6bd-4a10-b642-9bf027d61123",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     },
     {
-        "timestamp": "2026-01-28 12:51:30",
+        "timestamp": "2026-01-28 20:32:29",
         "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 12:53:45",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 12:57:49",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 12:58:31",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 12:59:14",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 13:02:06",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 13:06:33",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 13:06:43",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 13:10:56",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
-    },
-    {
-        "timestamp": "2026-01-28 13:11:46",
-        "ip": "127.0.0.1",
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
     }
 ]
