@@ -3,14 +3,12 @@ import os
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 import json
+import datetime
 
 # --- CONFIGURATION & ENVIRONMENT SETUP ---
-# Determine if running in production (Render) or local development
 IS_PRODUCTION = os.environ.get('RENDER') is not None
-# Set the base URL for the Node.js backend/viewer depending on the environment
 NODE_BASE_URL = "/app" if IS_PRODUCTION else "http://127.0.0.1:3006"
 
-# Configure CORS to allow requests from any origin (standard for this type of setup)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,38 +16,111 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# mount the 'menu' directory to serve static images for the UI cards
 menu_path = os.path.dirname(__file__) 
 app.add_static_files('/menu', menu_path)
 
-# --- CONSTANTS & DATA ---
+# --- LOGGING CONFIGURATION ---
+LOG_FILE = "visit_log.json"
+INTERACTIONS_FILE = "interactions.json"
 
+def log_visitor(request: Request):
+    """
+    Logs visitor IP, Timestamp, and User Agent to a JSON file.
+    """
+    # 1. Get Real IP (Handle Render Proxy)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        client_ip = forwarded.split(",")[0]
+    else:
+        client_ip = request.client.host if request.client else "Unknown"
+
+    # 2. Prepare data
+    visit_data = {
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ip": client_ip,
+        "user_agent": request.headers.get("user-agent", "Unknown")
+    }
+
+    # 3. Read existing
+    logs = []
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r") as f:
+                logs = json.load(f)
+        except:
+            logs = []
+
+    # 4. Debounce (prevent duplicates within 5 seconds)
+    should_log = True
+    if logs:
+        last_visit = logs[-1]
+        if last_visit['ip'] == client_ip:
+            last_time = datetime.datetime.strptime(last_visit['timestamp'], "%Y-%m-%d %H:%M:%S")
+            now_time = datetime.datetime.strptime(visit_data['timestamp'], "%Y-%m-%d %H:%M:%S")
+            if (now_time - last_time).total_seconds() < 5:
+                should_log = False
+
+    # 5. Save
+    if should_log:
+        logs.append(visit_data)
+        with open(LOG_FILE, "w") as f:
+            json.dump(logs, f, indent=4)
+            
+    return len(logs)
+
+def log_interaction(request: Request, action: str, detail: str):
+    """
+    Logs a specific user action (Button click, Filter change, etc.)
+    """
+    forwarded = request.headers.get("X-Forwarded-For")
+    client_ip = forwarded.split(",")[0] if forwarded else (request.client.host if request.client else "Unknown")
+
+    event_data = {
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ip": client_ip,
+        "action": action,
+        "detail": detail
+    }
+
+    events = []
+    if os.path.exists(INTERACTIONS_FILE):
+        try:
+            with open(INTERACTIONS_FILE, "r") as f:
+                events = json.load(f)
+        except:
+            events = []
+    
+    events.append(event_data)
+    
+    with open(INTERACTIONS_FILE, "w") as f:
+        json.dump(events, f, indent=4)
+
+# --- CONSTANTS & DATA ---
 C1, C2, C3, C4 = "Hanging oil lamp", "Two table candles", "Two floor chandeliers", "Four floor chandeliers"
 D1T1, D1T2, D1T3 = "Time: 10:00 am", "Time: 10:53 am", "Time: 12:53 pm" # Dec 25th
 D2T1, D2T2, D2T3 = "Time: 10:00 am", "Time: 10:56 am", "Time: 13:56 pm" # Apr 1st
 D3T1, D3T2, D3T3 = "Time: 10:00 am", "Time: 11:53 am", "Time: 13:53 pm" # Jun 6th
 
-# Default images to load when the app starts
 DEFAULT_IMAGE = "XII/Artificial/C1-pv2.exr"
 DEFAULT_IMAGE2 = "XII/Artificial/C2-pv2.exr"
 
 # --- MAIN PAGE ENTRY POINT ---
 
 @ui.page('/')
-async def main():
+async def main(request: Request):
+
+    total_visits = log_visitor(request)
+    print(f"New visit logged. Total: {total_visits}")
+
     # --- 1. SESSION STATE ---
-    # Stores state specific to the current connected user/browser tab
     class SessionState:
         def __init__(self):
-            self.hour = None          # Global filter: Selected hour
-            self.day = None           # Global filter: Selected day
-            self.selected_left = None # Currently selected image data for Left View
-            self.selected_right = None# Currently selected image data for Right View
-            self.all_cards = {}       # Dictionary to track UI button references for toggling visibility
-            self.iframe_container = None # Reference to the HTML container holding the iframe
-            self.iframe = None
-            # Placeholders for UI containers (Natural, Mixed, All combinations)
-            # These allow us to clear and repopulate specific sections dynamically
+            self.hour = None
+            self.day = None
+            self.selected_left = None
+            self.selected_right = None
+            self.all_cards = {}
+            self.iframe_container = None
             self.c_nat1 = self.c_nat2 = self.c_nat3 = None
             self.c_na1 = self.c_na2 = None
             self.c_all1 = self.c_all2 = self.c_all3 = self.c_all4 = self.c_all5 = self.c_all6 = None
@@ -57,44 +128,25 @@ async def main():
     state = SessionState()
 
     # --- 2. HELPER FUNCTIONS ---
-
     def format_exr(image_name):
-        """
-        Converts the UI thumbnail path (jpg) to the backend EXR path.
-        Handles URL encoding for special characters like '+'.
-        """
         if image_name.startswith('/menu/'):
             image_name = image_name[len('/menu/'):]
         parts = image_name.rsplit('/', 1)
         folder = parts[0]
         file_name = parts[1].rsplit('.', 1)[0]
-        folder = folder.replace('+', '%2B') # Encode '+' for URL safety
+        folder = folder.replace('+', '%2B')
         return f"XII/{folder}/{file_name}.exr"
     
     def format_label_html(text, image_path):
-        """
-        Formats the overlay label text to include the Date (inferred from filename)
-        and the Description. Returns HTML string.
-        """
         text_str = "<br>".join(str(t) for t in text) if isinstance(text, list) else str(text)
         day = None
         if image_path:
             if "D2" in image_path: day = "Apr 1st"
             elif "D3" in image_path: day = "Jun 6th"
             elif "D1" in image_path: day = "Dec 25th"
-        
-        if day:
-            return f"{day}<br><span>{text_str}</span>"
-        else:
-            return text_str
+        return f"{day}<br><span>{text_str}</span>" if day else text_str
 
     def show_selected_images():
-        """
-        Generates the HTML code for the Iframe viewer.
-        It constructs the URL with query parameters (img1, img2) and
-        creates the overlay divs for text labels.
-        """
-        # Internal helper to format paths
         def format_exr_inner(image_name):
             if image_name.startswith('/menu/'):
                 image_name = image_name[len('/menu/'):]
@@ -105,8 +157,7 @@ async def main():
             return f"XII/{folder}/{file_name}.exr"
 
         def format_label_text(text):
-            if isinstance(text, list):
-                return "<br>".join(str(t) for t in text)
+            if isinstance(text, list): return "<br>".join(str(t) for t in text)
             return str(text)
 
         def infer_day_from_image(image_path):
@@ -116,7 +167,6 @@ async def main():
             elif "D1" in image_path: return "Dec 25th"
             return None
         
-        # Determine images and labels based on session state or defaults
         img1 = format_exr_inner(state.selected_left["image"]) if state.selected_left else DEFAULT_IMAGE
         img2 = format_exr_inner(state.selected_right["image"]) if state.selected_right else DEFAULT_IMAGE2
 
@@ -129,10 +179,8 @@ async def main():
         label1 = f"{day1}<br><span>{label1_main}</span>" if day1 else label1_main
         label2 = f"{day2}<br><span>{label2_main}</span>" if day2 else label2_main
     
-        # Construct the Viewer URL
         url = f"{NODE_BASE_URL}/index.html?img1={img1}&img2={img2}&v=2"
     
-        # Return the complete HTML block (Iframe + Absolute positioned labels)
         html = f"""
         <div style="position: relative; width: 100%; height: 100%;">
             <iframe 
@@ -149,39 +197,26 @@ async def main():
         return html
 
     def update_all_cards_visibility():
-        """
-        Iterates through all UI cards to update the 'Selected' badge (L or R).
-        Shows the badge only if the card matches the currently selected Left or Right image.
-        """
         for image, buttons in state.all_cards.items():
             for button in buttons:
                 button.set_visibility(False); button.props('flat fab')
                 if image == (state.selected_left["image"] if state.selected_left else None):
-                    # Style for Left selection
                     button.set_visibility(True); button.props('color=white'); button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center'); button._text = "L"
                 elif image == (state.selected_right["image"] if state.selected_right else None):
-                    # Style for Right selection
                     button.set_visibility(True); button.props('color=white'); button.classes('absolute top-0 right-0 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center'); button._text = "R"
 
     def create_card(image, text, classes):
-        """
-        Creates a UI card representing a specific lighting scenario.
-        Handles the 'Click' event to select the image.
-        """
         with ui.card().tight().classes(classes) as c:
             with ui.image(image) as img:
-                # The 'Badge' button indicating selection state
                 button = ui.button('', on_click=None).props('flat color=white').classes('absolute top-2 right-2 m-1 bg-white text-black font-bold text-[10px] flex items-center justify-center')
                 button.set_visibility(False)
                 button.style('width: 16px !important; height: 16px !important; min-width: 0 !important; min-height: 0 !important; border-radius: 50% !important; font-size: 8px !important; padding: 0 !important;')
                 
-                # Register button in state for later updates
                 if image not in state.all_cards: state.all_cards[image] = []
                 state.all_cards[image].append(button)
                 
-                # --- CLICK HANDLER ---
                 async def toggle_selection():
-                    # Check Client-side localStorage to see which view (Left/Right) is currently active
+                    log_interaction(request, "Select Image", str(text))
                     selected_window = await ui.run_javascript('return localStorage.getItem("selectedWindow");')
                     
                     if not selected_window or selected_window == "none" or selected_window == "null": 
@@ -192,20 +227,16 @@ async def main():
                     exr_path = format_exr(image)
                     new_label_html = format_label_html(text, image)
 
-                    # Update LEFT View
                     if selected_window == "left":
                         state.selected_left = {"card": c, "image": image, "text": text}
                         await ui.run_javascript(f'localStorage.setItem("saved_L_img", "{image}");')
                         await ui.run_javascript(f'localStorage.setItem("saved_L_txt", \'{text_json}\');') 
                         update_all_cards_visibility()
-                        # Send Message to Iframe to update texture without reload
                         js_img = f'var iframe = document.getElementById("viewer-iframe"); if(iframe) {{ iframe.contentWindow.postMessage({{ "type": "change_left", "path": "{exr_path}" }}, "*"); }}'
                         await ui.run_javascript(js_img)
-                        # Update HTML label directly
                         await ui.run_javascript(f'document.getElementById("label-left").innerHTML = `{new_label_html}`;')
                         return
                     
-                    # Update RIGHT View
                     if selected_window == "right":
                         state.selected_right = {"card": c, "image": image, "text": text}
                         await ui.run_javascript(f'localStorage.setItem("saved_R_img", "{image}");')
@@ -223,26 +254,19 @@ async def main():
 
     classes_card = "h-[20vh] w-[15vh]"
 
-    # --- 3. REFRESH LOGIC (FILTERING) ---
-    # These functions rebuild the menu panels based on the selected Hour/Day filters.
-
+    # --- 3. REFRESH LOGIC ---
     def refresh_cards_natural():
-        """Refreshes the 'Natural Illumination' panel."""
         if not state.c_nat1: return
-        
         gh = state.hour
-        # Determine visibility booleans for each time slot based on the selected Global Hour (gh)
         v_D2T1, v_D2T2, v_D2T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="10:56" or gh=="All" or not gh), (gh=="13:56" or gh=="All" or not gh)
         v_D3T1, v_D3T2, v_D3T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="11:53" or gh=="All" or not gh), (gh=="13:53" or gh=="All" or not gh)
         v_D1T1, v_D1T2, v_D1T3 = (gh=="10:00" or gh=="All" or not gh), (gh=="10:53" or gh=="All" or not gh), (gh=="12:53" or gh=="All" or not gh)
         
-        # Specific overrides for incompatible times
         if gh == "10:53": v_D2T1=v_D2T2=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T3=False
         if gh == "10:56": v_D2T1=v_D2T3=v_D3T1=v_D3T2=v_D3T3=v_D1T1=v_D1T2=v_D1T3=False
         
         lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 2px; color: black;"
 
-        # Render April 1st Section
         show_nat1 = (state.day is None or state.day == "Apr 1st" or state.day == "All") and (v_D2T1 or v_D2T2 or v_D2T3)
         state.c_nat1.set_visibility(show_nat1); state.c_nat1.clear()
         if show_nat1:
@@ -253,7 +277,6 @@ async def main():
                     if v_D2T2: create_card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes_card)
                     if v_D2T3: create_card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes_card)
 
-        # Render June 6th Section
         show_nat2 = (state.day is None or state.day == "Jun 6th" or state.day == "All") and (v_D3T1 or v_D3T2 or v_D3T3)
         state.c_nat2.set_visibility(show_nat2); state.c_nat2.clear()
         if show_nat2:
@@ -264,7 +287,6 @@ async def main():
                     if v_D3T2: create_card("/menu/Natural/D3T2-pv2.jpg", [D3T2], classes_card)
                     if v_D3T3: create_card("/menu/Natural/D3T3-pv2.jpg", [D3T3], classes_card)
 
-        # Render Dec 25th Section
         show_nat3 = (state.day is None or state.day == "Dec 25th" or state.day == "All") and (v_D1T1 or v_D1T2 or v_D1T3)
         state.c_nat3.set_visibility(show_nat3); state.c_nat3.clear()
         if show_nat3:
@@ -277,20 +299,16 @@ async def main():
         update_all_cards_visibility()
 
     def refresh_cards_natart():
-        """Refreshes the 'Natural + Artificial' panel."""
         if not state.c_na1: return
-        
         gh = state.hour
         v_D1T3_C2 = v_D1T3_C5 = True; v_D2T3_C2 = v_D2T3_C5 = True
         
-        # Logic to hide incompatible mixed scenarios
         if gh == "12:53": v_D2T3_C2 = v_D2T3_C5 = False
         elif gh == "13:56": v_D1T3_C2 = v_D1T3_C5 = False
         elif gh and gh != "All" and gh not in ["12:53", "13:56"]: v_D1T3_C2 = v_D1T3_C5 = v_D2T3_C2 = v_D2T3_C5 = False
         
         lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
 
-        # Render sections based on day filter and visibility logic
         show_na1 = (v_D2T3_C2 or v_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
         state.c_na1.set_visibility(show_na1); state.c_na1.clear()
         if show_na1:
@@ -311,15 +329,11 @@ async def main():
         update_all_cards_visibility()
 
     def refresh_cards_all():
-        """Refreshes the 'All Combinations' panel (Large wide menu)."""
         if not state.c_all1: return
-        
         gh = state.hour
-        # Default all to True
         v_nat_D2T1=v_nat_D2T2=v_nat_D2T3=True; v_nat_D3T1=v_nat_D3T2=v_nat_D3T3=True; v_nat_D1T1=v_nat_D1T2=v_nat_D1T3=True
         v_na_D1T3_C2=v_na_D1T3_C5=True; v_na_D2T3_C2=v_na_D2T3_C5=True
 
-        # Extensive logic to disable specific cards based on selected hour
         if gh == "10:00":
              v_nat_D2T2=v_nat_D2T3=v_nat_D3T2=v_nat_D3T3=v_nat_D1T2=v_nat_D1T3=False
              v_na_D1T3_C2=v_na_D1T3_C5=v_na_D2T3_C2=v_na_D2T3_C5=False
@@ -345,7 +359,6 @@ async def main():
 
         lbl_style = "font-size: 1.6vh; font-weight: 400; margin-bottom: 0.5vh; color: black;"
         
-        # --- NATURAL SECTION (in All) ---
         show_all1 = (state.day is None or state.day == "Apr 1st" or state.day == "All") and (v_nat_D2T1 or v_nat_D2T2 or v_nat_D2T3)
         state.c_all1.set_visibility(show_all1); state.c_all1.clear()
         if show_all1:
@@ -356,7 +369,6 @@ async def main():
                     if v_nat_D2T2: create_card("/menu/Natural/D2T2-pv2.jpg", [D2T2], classes_card)
                     if v_nat_D2T3: create_card("/menu/Natural/D2T3-pv2.jpg", [D2T3], classes_card)
         
-        # ... (Similar logic for June 6th and Dec 25th in 'All' view)
         show_all2 = (state.day is None or state.day == "Jun 6th" or state.day == "All") and (v_nat_D3T1 or v_nat_D3T2 or v_nat_D3T3)
         state.c_all2.set_visibility(show_all2); state.c_all2.clear()
         if show_all2:
@@ -377,7 +389,6 @@ async def main():
                     if v_nat_D1T2: create_card("/menu/Natural/D1T2-pv2.jpg", [D1T2], classes_card)
                     if v_nat_D1T3: create_card("/menu/Natural/D1T3-pv2.jpg", [D1T3], classes_card)
         
-        # --- ARTIFICIAL SECTION (in All) ---
         state.c_all4.clear()
         with state.c_all4:
              ui.label("Spacer").style(lbl_style + "visibility: hidden;")
@@ -388,7 +399,6 @@ async def main():
                 create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
                 create_card("/menu/Artificial/C5-pv2.jpg", ["All artificial lighting"], classes_card)
         
-        # --- NAT+ART SECTION (in All) ---
         show_all5 = (v_na_D2T3_C2 or v_na_D2T3_C5) and (state.day is None or state.day == "Apr 1st" or state.day == "All")
         state.c_all5.set_visibility(show_all5); state.c_all5.clear()
         if show_all5:
@@ -409,48 +419,67 @@ async def main():
         update_all_cards_visibility()
 
     def refresh_all_views():
-        """Master refresh function."""
         refresh_cards_natural()
         refresh_cards_natart()
         refresh_cards_all()
 
     # --- 4. HTML INJECTION & STYLES ---
     
-    # Inject JS to handle click detection on the container (Split screen logic)
     ui.add_body_html("""
     <script>
     async function restoreSelectedWindow() {
         const container = document.getElementById('container');
-        if (!container) return;
         
-        // Restore previous selection from local storage
+        // Restore from storage
         let saved = localStorage.getItem('selectedWindow');
-        if (saved) {
+        if (typeof updateSelectedWindowHighlight === "function" && saved) {
             updateSelectedWindowHighlight(saved);
         }
         
-        // Listen for clicks to determine which side (Left/Right) is active
-        container.addEventListener('click', async (e) => {
-            const rect = container.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            let selectedWindow = (x < rect.width / 2) ? 'left' : 'right';
-            localStorage.setItem('selectedWindow', selectedWindow);
-            updateSelectedWindowHighlight(selectedWindow);
-        });
+        // 1. CLICS ON CONTAINER (Borders/Labels)
+        if (container) {
+            container.addEventListener('click', async (e) => {
+                const rect = container.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                
+                // Determine Left or Right
+                let selectedWindow = (x < rect.width / 2) ? 'left' : 'right';
+                
+                triggerLogAndSave(selectedWindow);
+            });
+        }
     }
+
+    // Unified function to save and trigger Python Log
+    function triggerLogAndSave(value) {
+        console.log("Window selection changed to:", value);
+        localStorage.setItem('selectedWindow', value);
+        
+        if (typeof updateSelectedWindowHighlight === "function") {
+            updateSelectedWindowHighlight(value);
+        }
+
+        // --- TRIGGER PYTHON HIDDEN BUTTONS ---
+        let btnId = '';
+        if (value === 'left') btnId = 'log-btn-left';
+        else if (value === 'right') btnId = 'log-btn-right';
+        else btnId = 'log-btn-none'; // For 'none' or 'null'
+
+        const btn = document.getElementById(btnId);
+        if (btn) btn.click();
+    }
+
     window.addEventListener('load', restoreSelectedWindow);
     
-    // Listen for messages from the Iframe
+    // 2. MESSAGES FROM IFRAME (Clics inside 3D viewer)
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'window_selected') {
-            console.log("Recibido desde Iframe:", event.data.value);
-            localStorage.setItem('selectedWindow', event.data.value);
+            triggerLogAndSave(event.data.value);
         }
     });
     </script>
     """)
 
-    # Inject CSS for custom scrollbars and dropdown panel animations
     ui.add_head_html('''
     <style>
     body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
@@ -493,22 +522,18 @@ async def main():
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
     ''')
 
-    categories = ["Inici", "Natural illumination", "Artificial illumination", "Natural + Artificial illumination", "All combinations"]
+    # Changed "Inici" to "Home"
+    categories = ["Home", "Natural illumination", "Artificial illumination", "Natural + Artificial illumination", "All combinations"]
     menu_panels = {}
 
-   
     # --- HOME INFO DIALOG ---
     with ui.dialog() as home_dialog, ui.card().classes('w-[600px] max-w-[90vw] p-0'):
-        # Header with Title and Close 'X'
         with ui.row().classes('w-full items-center justify-between p-4 bg-gray-100 border-b'):
             ui.label('About the Application').classes('text-lg font-bold text-gray-800')
-            # The 'X' to close
             ui.icon('close').classes('cursor-pointer text-gray-500 hover:text-black hover:bg-gray-200 rounded-full p-1 transition') \
                 .on('click', home_dialog.close)
         
-        # Scrollable Content Area
         with ui.scroll_area().classes('h-[50vh] p-6'):
-            # Style definition for the icons inside markdown
             icon_style = "vertical-align: text-bottom; font-size: 1.2rem; margin-right: 4px; color: #555;"
 
             ui.markdown(f"""
@@ -527,7 +552,7 @@ async def main():
                Hover over the top icons to view the options:
                - <span class="material-symbols-outlined" style="{icon_style}">sunny</span> **Natural:** Different times and months of the year.
                - <span class="material-symbols-outlined" style="{icon_style}">lightbulb_2</span> **Artificial:** Candles, oil lamps, and chandeliers.
-               - <span class="material-symbols-outlined" style="{icon_style}">sunny</span><span style="vertical-align: text-bottom;">+</span><span class="material-symbols-outlined" style="{icon_style}">lightbulb_2</span> **Combinacions:** Mixture of natural and artificial light.
+               - <span class="material-symbols-outlined" style="{icon_style}">sunny</span><span style="vertical-align: text-bottom;">+</span><span class="material-symbols-outlined" style="{icon_style}">lightbulb_2</span> **Combinations:** Mixture of natural and artificial light.
                - <span style=" font-size: 0.9rem;">ALL</span> **All Combinations:** All options in a single large panel.
             
             3. **Global Filters:**
@@ -542,26 +567,32 @@ async def main():
 
     ui.timer(0.1, home_dialog.open, once=True)
 
-
-            
-        
-
     # --- 5. UI LAYOUT CONSTRUCTION ---
     with ui.column().classes('absolute-full gap-0 no-wrap'):
+
+        # --- HIDDEN BUTTONS FOR LOGGING (BRIDGE JS -> PYTHON) ---
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Left View")) \
+            .props('id=log-btn-left').style('display: none')
+        
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Right View")) \
+            .props('id=log-btn-right').style('display: none')
+        
+        ui.button(on_click=lambda: log_interaction(request, "Select Window", "Deselected (None)")) \
+            .props('id=log-btn-none').style('display: none')
 
         # --- MENU ROW (TOP BAR) ---
         with ui.element('div').classes('w-full bg-white shadow-sm z-50 relative flex flex-col md:flex-row items-center px-2 md:px-6 py-1 md:py-0 h-auto md:h-[50px]'):
             
-            # --- [1] LEFT: TOOLS (SYNC, TONE MAPPING) ---
+            # --- [1] LEFT: TOOLS ---
             with ui.row().classes('items-center justify-start md:mr-auto z-50'):
-                # A) SYNC VIEW TOGGLE
+                # A) SYNC VIEW
                 sync_state = {'active': True}
                 async def toggle_sync():
                     sync_state['active'] = not sync_state['active']
+                    log_interaction(request, "Tool Sync", "On" if sync_state['active'] else "Off")
                     if sync_state['active']: icon_sync.classes('text-black', remove='text-gray-300')
                     else: icon_sync.classes('text-gray-300', remove='text-black')
                     
-                    # Post message to iframe to enable/disable camera sync
                     await ui.run_javascript(f'''
                         var iframe = document.getElementById("viewer-iframe");
                         if(iframe) {{
@@ -578,13 +609,11 @@ async def main():
                         .on('click', toggle_sync)
                     with ui.tooltip('Sync Views'): pass
 
-
-                 # --- B) TONE MAPPING (DYNAMIC MENU) ---
+                 # --- B) TONE MAPPING ---
                 tm_state = {
                     'algo': 'toneMappingReinhardBasic', 
                     'target': 'both',
                     'fix': False,
-                    # Parameters for different algorithms
                     'exposure': 1.0,  
                     'key': 0.18,      
                     'white': 1.0,     
@@ -592,7 +621,6 @@ async def main():
                 }
 
                 async def update_tm_js():
-                    # Send entire Tone Mapping state to JS
                     await ui.run_javascript(f'''
                         var iframe = document.getElementById("viewer-iframe");
                         if(iframe) {{
@@ -609,20 +637,24 @@ async def main():
                         }}
                     ''')
 
+                def log_tm_selection(category, value):
+                    log_interaction(request, "Tone Mapping Tool", f"{category}: {value}")
+
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     ui.icon('tune', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined')
                     
-                    # Tone Mapping Dropdown Menu
                     with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-4 z-50 w-64'):
                         ui.label("Tone Mapping").classes('text-xs font-bold text-gray-400 mb-2 uppercase')
                         
-                        # 1. Target (Both, Window 1, Window 2)
+                        # 1. Target
                         ui.select(
                             options={'both': 'Both Windows', 'window1': 'Window 1', 'window2': 'Window 2'},
                             value=tm_state['target'], label="Apply To"
-                        ).bind_value(tm_state, 'target').on_value_change(update_tm_js).classes('w-full mb-2 text-sm')
+                        ).bind_value(tm_state, 'target') \
+                         .on_value_change(lambda e: [update_tm_js(), log_tm_selection("Target", e.value)]) \
+                         .classes('w-full mb-2 text-sm')
 
-                        # 2. Algorithm Selector
+                        # 2. Algorithm
                         ui.select(
                             options={
                                 "toneMappingLinear": "Linear", 
@@ -631,31 +663,27 @@ async def main():
                                 "toneMappingLuminance": "Luminance"
                             },
                             value=tm_state['algo'], label="Algorithm"
-                        ).bind_value(tm_state, 'algo').on_value_change(update_tm_js).classes('w-full mb-2 text-sm')
+                        ).bind_value(tm_state, 'algo') \
+                         .on_value_change(lambda e: [update_tm_js(), log_tm_selection("Algorithm", e.value)]) \
+                         .classes('w-full mb-2 text-sm')
                         
-                        # --- DYNAMIC CONTROLS (Visibility depends on selected Algo) ---
-
-                        # Exposure Slider
+                        # --- SLIDERS (Visual only, no logging) ---
                         with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x in ['toneMappingLinear', 'toneMappingReinhardBasic']):
                             ui.label("Exposure").classes('text-xs text-gray-500 mt-2')
                             with ui.row().classes('w-full items-center gap-2'):
                                 ui.slider(min=0.1, max=10.0, step=0.1, value=tm_state['exposure']).bind_value(tm_state, 'exposure').on_value_change(update_tm_js).classes('col-grow')
                                 ui.label().bind_text_from(tm_state, 'exposure', backward=lambda x: f"{x:.1f}").classes('text-xs w-8 text-right')
 
-                        # Reinhard Extended Sliders
                         with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x == 'toneMappingReinhardExtended'):
-                            # Key
                             ui.label("Key").classes('text-xs text-gray-500 mt-2')
                             with ui.row().classes('w-full items-center gap-2'):
                                 ui.slider(min=0.0, max=1.0, step=0.01, value=tm_state['key']).bind_value(tm_state, 'key').on_value_change(update_tm_js).classes('col-grow')
                                 ui.label().bind_text_from(tm_state, 'key', backward=lambda x: f"{x:.2f}").classes('text-xs w-8 text-right')
-                            # L White
                             ui.label("L White").classes('text-xs text-gray-500 mt-1')
                             with ui.row().classes('w-full items-center gap-2'):
                                 ui.slider(min=0.1, max=10.0, step=0.1, value=tm_state['white']).bind_value(tm_state, 'white').on_value_change(update_tm_js).classes('col-grow')
                                 ui.label().bind_text_from(tm_state, 'white', backward=lambda x: f"{x:.1f}").classes('text-xs w-8 text-right')
 
-                        # Luminance Slider
                         with ui.column().classes('w-full p-0 m-0 gap-0').bind_visibility_from(tm_state, 'algo', backward=lambda x: x == 'toneMappingLuminance'):
                             ui.label("Max Luminance").classes('text-xs text-gray-500 mt-2')
                             with ui.row().classes('w-full items-center gap-2'):
@@ -663,20 +691,20 @@ async def main():
                                     .bind_value(tm_state, 'maxLum') \
                                     .on_value_change(update_tm_js) \
                                     .classes('col-grow')
+                                ui.label().bind_text_from(tm_state, 'maxLum', backward=lambda x: f"{x:.5f}".rstrip('0').rstrip('.')).classes('text-xs w-12 text-right')
                                 
-                                ui.label().bind_text_from(
-                                    tm_state, 
-                                    'maxLum', 
-                                    backward=lambda x: f"{x:.5f}".rstrip('0').rstrip('.')
-                                ).classes('text-xs w-12 text-right')
-                                
-                        # Fix Normalization toggle
+                        # Fix Normalization
                         ui.separator().classes('my-2')
-                        ui.switch('Fix Normalization', value=tm_state['fix']).bind_value(tm_state, 'fix').on_value_change(update_tm_js).props('dense').classes('text-sm text-gray-700 w-full') 
+                        ui.switch('Fix Normalization', value=tm_state['fix']) \
+                            .bind_value(tm_state, 'fix') \
+                            .on_value_change(lambda e: [update_tm_js(), log_tm_selection("Fix Normalization", "On" if e.value else "Off")]) \
+                            .props('dense').classes('text-sm text-gray-700 w-full') 
+
                     with ui.tooltip('Tone Mapping'): pass
                     
                 # C) IMAGE DIFFERENCE TOOL
                 async def open_diff_js():
+                    log_interaction(request, "Tool Difference", "Clicked")
                     await ui.run_javascript('''
                         var iframe = document.getElementById("viewer-iframe");
                         if(iframe) {
@@ -691,32 +719,27 @@ async def main():
                     with ui.tooltip('Image Difference'): pass
 
 
-            # --- [2] CENTER: CATEGORIES (MAIN MENU) ---
+            # --- [2] CENTER: CATEGORIES ---
             active_panel = {'name': None}
             def show_panel(e, cat):
-                """Mouse-over handler to show/hide category panels."""
                 current = active_panel['name']
                 if current and current in menu_panels and current != cat:
                     menu_panels[current].set_visibility(False)
-                if cat != "Inici":
+                if cat != "Home":
                     if cat in menu_panels:
                         menu_panels[cat].set_visibility(True)
                         active_panel['name'] = cat
                 else:
-                    # Hide all if Home/Inici is hovered
                     if current and current in menu_panels: menu_panels[current].set_visibility(False)
                     active_panel['name'] = None
 
             with ui.row().classes('w-full md:w-auto flex justify-center gap-8 md:absolute md:left-1/2 md:transform md:-translate-x-1/2 flex-wrap md:flex-nowrap'):
                 icon_size = '24px' 
                 for cat in categories:
-                    # Render icons for each category with mouseover events
-                    if cat == "Inici": 
-                        
+                    if cat == "Home": 
                         ui.icon('info', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined') \
                             .on('mouseover', lambda e, cat=cat: show_panel(e, cat)) \
-                            .on('click', home_dialog.open) 
-
+                            .on('click', lambda: [log_interaction(request, "Open Info", "Home Icon"), home_dialog.open()]) 
                     elif cat == "Natural illumination": 
                         ui.icon('sunny', size=icon_size).classes('cursor-pointer text-gray-700 hover:text-black hover:bg-gray-100 p-1 rounded transition material-symbols-outlined').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
                     elif cat == "Artificial illumination": 
@@ -729,10 +752,10 @@ async def main():
                     elif cat == "All combinations":
                         ui.label('ALL').classes('cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition text-gray-700 font-light text-md').on('mouseover', lambda e, cat=cat: show_panel(e, cat))
 
-            # --- [3] RIGHT: FILTERS (HOUR / DAY) ---
+            # --- [3] RIGHT: FILTERS ---
             with ui.row().classes('w-full md:w-auto flex justify-center md:justify-end gap-6 md:ml-auto items-center flex-nowrap mt-2 md:mt-0'):
                 
-                # --- [B] HOUR FILTER ---
+                # [B] HOUR FILTER
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     def toggle_hour_menu(): hour_menu.toggle()
                     icon_hour = ui.icon('access_time', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_hour_menu)
@@ -740,6 +763,7 @@ async def main():
                     with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as hour_menu:
                         ui.label("Global Hour").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
                         def set_global_hour_fn(h):
+                            log_interaction(request, "Filter Hour", h)
                             state.hour = h; ui.run_javascript(f'localStorage.setItem("global_hour", "{h}")')
                             if h == "All": icon_hour.set_visibility(True); label_hour.set_visibility(False)
                             else: icon_hour.set_visibility(False); label_hour.set_text(h); label_hour.set_visibility(True)
@@ -749,7 +773,7 @@ async def main():
                         ui.menu_item("11:53 am", lambda: set_global_hour_fn("11:53")); ui.menu_item("12:53 pm", lambda: set_global_hour_fn("12:53"))
                         ui.menu_item("13:53 pm", lambda: set_global_hour_fn("13:53")); ui.menu_item("13:56 pm", lambda: set_global_hour_fn("13:56"))
 
-                # --- [C] DAY FILTER ---
+                # [C] DAY FILTER
                 with ui.element('div').classes('relative flex items-center justify-center w-10'):
                     def toggle_day_menu(): day_menu.toggle()
                     icon_day = ui.icon('calendar_today', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined').on('click', toggle_day_menu)
@@ -757,6 +781,7 @@ async def main():
                     with ui.menu().props('auto-close="false" anchor="bottom middle" self="top middle"').classes('bg-white shadow-xl rounded-md p-2 z-50 w-40') as day_menu:
                         ui.label("Global Day").classes('text-xs font-bold text-gray-400 px-2 py-1 uppercase'); ui.separator().classes('mb-1')
                         def set_global_day_fn(d):
+                            log_interaction(request, "Filter Day", d)
                             state.day = d; ui.run_javascript(f'localStorage.setItem("global_day", "{d}")')
                             if d == "All": icon_day.set_visibility(True); label_day.set_visibility(False)
                             else: icon_day.set_visibility(False); label_day.set_text(d); label_day.set_visibility(True)
@@ -764,13 +789,8 @@ async def main():
                         ui.menu_item("All", lambda: set_global_day_fn("All")); ui.menu_item("Apr 1st", lambda: set_global_day_fn("Apr 1st"))
                         ui.menu_item("Jun 6th", lambda: set_global_day_fn("Jun 6th")); ui.menu_item("Dec 25th", lambda: set_global_day_fn("Dec 25th"))
 
-                # --- [D] VISIBILITY ICON (Placeholder) ---
-                #with ui.element('div').classes('relative flex items-center justify-center w-10'):
-                    #ui.icon('visibility', size="22px").classes('cursor-pointer text-gray-600 hover:text-black material-symbols-outlined')
-
-                # --- LIFECYCLE: RESTORE STATE FROM LOCALSTORAGE ---
+                # RESTORE GLOBAL STATE
                 async def restore_globals():
-                    """Restores selected hour/day from browser storage on load."""
                     g_hour = await ui.run_javascript('return localStorage.getItem("global_hour")')
                     g_day = await ui.run_javascript('return localStorage.getItem("global_day")')
                     
@@ -787,7 +807,6 @@ async def main():
                 ui.timer(0.1, restore_globals, once=True)
 
                 async def restore_session_images():
-                    """Restores previously selected images (Left/Right) from browser storage."""
                     l_img = await ui.run_javascript('return localStorage.getItem("saved_L_img");')
                     l_txt_raw = await ui.run_javascript('return localStorage.getItem("saved_L_txt");')
                     l_txt = None
@@ -813,22 +832,18 @@ async def main():
                 ui.timer(0.2, restore_session_images, once=True)
 
             # --- DROPDOWN PANELS ---
-
             def hide_panel(panel_key):
                 if panel_key in menu_panels: menu_panels[panel_key].set_visibility(False)
                 if active_panel['name'] == panel_key: active_panel['name'] = None
 
-            # 1. Natural Panel
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Natural illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural illumination"))
                 with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
                     with ui.row().classes('justify-start gap-[3vh] items-start flex-nowrap').style('display: inline-flex;'):
-                        # Placeholders to be filled by refresh_cards_natural
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat1: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat2: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_nat3: pass
 
-            # 2. Artificial Panel (Static content)
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Artificial illumination"))
                 with ui.row().classes('w-full overflow-x-auto no-scrollbar').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
@@ -839,7 +854,6 @@ async def main():
                                 create_card("/menu/Artificial/C3-pv2.jpg", [C3], classes_card); create_card("/menu/Artificial/C4-pv2.jpg", [C4], classes_card)
                                 create_card("/menu/Artificial/C5-pv2.jpg", ["All artificial lighting"], classes_card)
 
-            # 3. Mixed Panel
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["Natural + Artificial illumination"] = panel; panel.on('mouseleave', lambda: hide_panel("Natural + Artificial illumination"))
                 with ui.row().classes('w-full overflow-x-auto no-scrollbar gap-[3vh]').style('padding-left: 5vh; white-space: nowrap; padding-top: 1.5vh; padding-bottom: 1.5vh;'):
@@ -847,7 +861,6 @@ async def main():
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na1: pass
                         with ui.column().classes('items-start flex-shrink-0').style('align-items: flex-start;') as state.c_na2: pass
 
-            # 4. All Combinations Panel
             with ui.column().classes('dropdown-panel') as panel:
                 panel.set_visibility(False); menu_panels["All combinations"] = panel; panel.on('mouseleave', lambda: hide_panel("All combinations"))
                 with ui.row().classes('cards-wrapper w-full overflow-x-auto overflow-y-hidden no-scrollbar flex-nowrap pl-10 pr-10 items-start').style('white-space: nowrap; margin-top: 1.5vh; padding-bottom: 1.5vh; gap: 6vh;'):
@@ -871,6 +884,128 @@ async def main():
                             with ui.column().classes('flex-shrink-0') as state.c_all6: pass
         
         # --- IFRAME VIEWER CONTAINER ---
-        state.iframe_container = ui.html(show_selected_images(), sanitize=False).classes('w-full flex-grow').style('border: none; margin: 0; padding: 0;')
+        state.iframe_container = ui.html(show_selected_images(), sanitize=False) \
+            .classes('w-full flex-grow') \
+            .style('border: none; margin: 0; padding: 0;') \
+            .props('id=container')
+
+
+# --- STATS PAGE ---
+@ui.page('/stats')
+def stats_page():
+    
+    # 1. LOAD INTERACTIONS (IN MEMORY)
+    interactions_by_ip = {}
+    if os.path.exists(INTERACTIONS_FILE):
+        try:
+            with open(INTERACTIONS_FILE, "r") as f:
+                raw_events = json.load(f)
+            
+            from collections import defaultdict
+            temp_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+            
+            for e in raw_events:
+                ip = e.get('ip', 'Unknown')
+                action = e.get('action', 'Other')
+                detail = e.get('detail', '-')
+                temp_stats[ip][action][detail] += 1
+            
+            # Convert to list for table
+            for ip, actions in temp_stats.items():
+                rows = []
+                for action, details in actions.items():
+                    for detail_name, count in details.items():
+                        rows.append({"action": action, "detail": detail_name, "count": count})
+                interactions_by_ip[ip] = rows
+        except Exception:
+            interactions_by_ip = {}
+
+    # 2. RESET FUNCTION
+    def reset_stats():
+        if os.path.exists(LOG_FILE): os.remove(LOG_FILE)
+        if os.path.exists(INTERACTIONS_FILE): os.remove(INTERACTIONS_FILE)
+        ui.notify('🧹 All data has been cleared.', color='positive')
+        ui.timer(1.0, lambda: ui.open('/stats'), once=True)
+
+    # 3. INTERFACE: HEADER
+    with ui.row().classes('w-full justify-between items-center mb-6'):
+        ui.label('User Analytics').classes('text-2xl font-bold')
+        ui.button('Reset Data', on_click=reset_stats, icon='delete_forever').props('color=red outline')
+
+    ui.label('Click on a row to see details for that IP below the table.').classes('text-sm text-gray-500 mb-2')
+
+    # 4. INTERFACE: MAIN TABLE (VISIT SUMMARY)
+    main_table = None 
+
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as f:
+            visit_data = json.load(f)
+        
+        # Group visits by IP
+        ip_summary = {}
+        for visit in visit_data:
+            ip = visit.get('ip', 'Unknown')
+            timestamp = visit.get('timestamp', '-')
+            if ip not in ip_summary: ip_summary[ip] = {'count': 0, 'last_seen': timestamp}
+            ip_summary[ip]['count'] += 1
+            ip_summary[ip]['last_seen'] = timestamp
+
+        summary_rows = [{'ip': ip, 'count': d['count'], 'last_seen': d['last_seen']} for ip, d in ip_summary.items()]
+        summary_rows.sort(key=lambda x: x['count'], reverse=True)
+
+        # DRAW TABLE
+        main_table = ui.table(
+            columns=[
+                {'name': 'ip', 'label': 'IP Address (Click to view)', 'field': 'ip', 'align': 'left', 'classes': 'font-bold text-blue-900'},
+                {'name': 'count', 'label': 'Total Visits', 'field': 'count', 'align': 'center', 'sortable': True},
+                {'name': 'last_seen', 'label': 'Last Seen', 'field': 'last_seen', 'align': 'right', 'sortable': True}
+            ],
+            rows=summary_rows, 
+            pagination=10
+        ).classes('w-full cursor-pointer hover:bg-gray-50 mb-8')
+        
+    else:
+        ui.label("No visit data found.").classes('text-gray-500 italic p-2')
+
+    # 5. DETAILS CONTAINER
+    details_container = ui.column().classes('w-full transition-all')
+
+    # 6. CLICK LOGIC
+    def show_ip_details(e):
+        selected_ip = e.args[1]['ip'] if e.args[1] else None
+        details_container.clear() 
+        
+        if not selected_ip: return
+
+        with details_container:
+            ui.separator().classes('mb-4')
+            
+            with ui.card().classes('w-full border-l-4 border-blue-500 shadow-lg bg-gray-50'):
+                with ui.row().classes('items-center justify-between w-full mb-4'):
+                    with ui.row().classes('items-center gap-2'):
+                        ui.icon('list_alt', size='md').classes('text-blue-600')
+                        ui.label(f"Interaction Details: {selected_ip}").classes('text-xl font-bold text-gray-800')
+                    
+                    ui.button('Close Details', on_click=details_container.clear, icon='close').props('flat color=red dense')
+
+                user_rows = interactions_by_ip.get(selected_ip, [])
+                
+                if user_rows:
+                    ui.table(
+                        columns=[
+                            {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left', 'sortable': True},
+                            {'name': 'detail', 'label': 'Detail', 'field': 'detail', 'align': 'left', 'sortable': True},
+                            {'name': 'count', 'label': 'Count', 'field': 'count', 'align': 'center', 'sortable': True}
+                        ],
+                        rows=user_rows,
+                        pagination=10
+                    ).classes('w-full bg-white')
+                else:
+                    ui.label("This IP visited the site but did not interact with any elements.").classes('text-orange-600 italic p-4')
+            
+            ui.run_javascript('window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });')
+
+    if main_table:
+        main_table.on('rowClick', show_ip_details)
 
 ui.run(title="Mural Lighting")

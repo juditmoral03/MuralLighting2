@@ -1,0 +1,224 @@
+[
+    {
+        "timestamp": "2026-01-28 12:40:05",
+        "ip": "127.0.0.1",
+        "action": "Select Image",
+        "detail": "['Time: 10:00 am']"
+    },
+    {
+        "timestamp": "2026-01-28 12:40:51",
+        "ip": "127.0.0.1",
+        "action": "Select Image",
+        "detail": "['Time: 10:00 am']"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:12",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Target: window1"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:21",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Target: both"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:26",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Target: window2"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:32",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Target: both"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:38",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Algorithm: toneMappingLinear"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:44",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Algorithm: toneMappingReinhardBasic"
+    },
+    {
+        "timestamp": "2026-01-28 12:41:54",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Algorithm: toneMappingLinear"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:16",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:17",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: Off"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:17",
+        "ip": "127.0.0.1",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:28",
+        "ip": "127.0.0.1",
+        "action": "Tool Sync",
+        "detail": "Off"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:31",
+        "ip": "127.0.0.1",
+        "action": "Tool Sync",
+        "detail": "On"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:41",
+        "ip": "127.0.0.1",
+        "action": "Tool Sync",
+        "detail": "Off"
+    },
+    {
+        "timestamp": "2026-01-28 12:42:51",
+        "ip": "127.0.0.1",
+        "action": "Tool Sync",
+        "detail": "On"
+    },
+    {
+        "timestamp": "2026-01-28 12:43:12",
+        "ip": "127.0.0.1",
+        "action": "Filter Hour",
+        "detail": "All"
+    },
+    {
+        "timestamp": "2026-01-28 12:43:14",
+        "ip": "127.0.0.1",
+        "action": "Filter Day",
+        "detail": "All"
+    },
+    {
+        "timestamp": "2026-01-28 12:43:24",
+        "ip": "127.0.0.1",
+        "action": "Filter Hour",
+        "detail": "10:00"
+    },
+    {
+        "timestamp": "2026-01-28 12:43:26",
+        "ip": "127.0.0.1",
+        "action": "Filter Hour",
+        "detail": "All"
+    },
+    {
+        "timestamp": "2026-01-28 12:43:51",
+        "ip": "127.0.0.1",
+        "action": "Filter Day",
+        "detail": "All"
+    },
+    {
+        "timestamp": "2026-01-28 12:53:57",
+        "ip": "127.0.0.1",
+        "action": "Tool Difference",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-01-28 12:54:23",
+        "ip": "127.0.0.1",
+        "action": "Tool Difference",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-01-28 12:54:24",
+        "ip": "127.0.0.1",
+        "action": "Tool Difference",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-01-28 13:06:46",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-01-28 13:06:48",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Left View"
+    },
+    {
+        "timestamp": "2026-01-28 13:07:05",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-01-28 13:07:22",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Deselected (None)"
+    },
+    {
+        "timestamp": "2026-01-28 13:07:41",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Left View"
+    },
+    {
+        "timestamp": "2026-01-28 13:08:01",
+        "ip": "127.0.0.1",
+        "action": "Select Image",
+        "detail": "['Time: 10:00 am']"
+    },
+    {
+        "timestamp": "2026-01-28 13:08:03",
+        "ip": "127.0.0.1",
+        "action": "Select Image",
+        "detail": "['Time: 13:53 pm']"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:02",
+        "ip": "127.0.0.1",
+        "action": "Open Info",
+        "detail": "Home Icon"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:18",
+        "ip": "127.0.0.1",
+        "action": "Open Info",
+        "detail": "Home Icon"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:49",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:49",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Left View"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:50",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-01-28 13:11:50",
+        "ip": "127.0.0.1",
+        "action": "Select Window",
+        "detail": "Deselected (None)"
+    }
+]
