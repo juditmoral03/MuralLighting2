@@ -1,23 +1,219 @@
 [
     {
-        "timestamp": "2026-01-28 20:25:51",
+        "timestamp": "2026-02-04 13:35:00",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Time: 11:53 am']"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:01",
         "ip": "127.0.0.1",
         "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
         "action": "Select Window",
         "detail": "Right View"
     },
     {
-        "timestamp": "2026-01-28 20:25:52",
+        "timestamp": "2026-02-04 13:35:04",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Time: 11:53 am']"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:08",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:11",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:26",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Hanging oil lamp']"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:28",
         "ip": "127.0.0.1",
         "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
         "action": "Select Window",
         "detail": "Left View"
     },
     {
-        "timestamp": "2026-01-28 20:26:25",
+        "timestamp": "2026-02-04 13:35:30",
         "ip": "127.0.0.1",
-        "session_id": "392f0703-b6bd-4a10-b642-9bf027d61123",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Two table candles']"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:33",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:35:35",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:15",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:16",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
         "action": "Select Image",
         "detail": "['All artificial lighting']"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:18",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Window",
+        "detail": "Left View"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:19",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Four floor chandeliers']"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:21",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:23",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:53",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Window",
+        "detail": "Right View"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:55",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Four floor chandeliers']"
+    },
+    {
+        "timestamp": "2026-02-04 13:39:56",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['All artificial lighting']"
+    },
+    {
+        "timestamp": "2026-02-04 13:40:10",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Window",
+        "detail": "Left View"
+    },
+    {
+        "timestamp": "2026-02-04 13:40:12",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Time: 11:53 am']"
+    },
+    {
+        "timestamp": "2026-02-04 13:44:01",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:44:03",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:47:48",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Select Image",
+        "detail": "['Time: 12:53 pm', 'All artificial lighting']"
+    },
+    {
+        "timestamp": "2026-02-04 13:47:56",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Filter Hour",
+        "detail": "10:00"
+    },
+    {
+        "timestamp": "2026-02-04 13:48:04",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:48:06",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:48:29",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:48:31",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
+    },
+    {
+        "timestamp": "2026-02-04 13:49:37",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Global Reset",
+        "detail": "Clicked"
+    },
+    {
+        "timestamp": "2026-02-04 13:49:40",
+        "ip": "127.0.0.1",
+        "session_id": "dbf43161-bfea-4bca-beb1-44b9e2bb2f87",
+        "action": "Tone Mapping Tool",
+        "detail": "Fix Normalization: On"
     }
 ]
