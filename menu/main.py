@@ -94,6 +94,30 @@ async def main(request: Request):
     session_id = app.storage.browser['user_uid']
     log_visitor(request, session_id)
 
+    # --- NEW: SESSION ID DIALOG ---
+    with ui.dialog() as session_dialog, ui.card().classes('w-[400px] max-w-[90vw] p-6 flex flex-col items-center gap-4'):
+        ui.icon('badge', size='48px').classes('text-blue-500 mb-2')
+        ui.label('Session Information').classes('text-xl font-bold text-gray-800')
+        ui.label('Please copy your session ID number:').classes('text-sm text-gray-600 text-center')
+        
+        # Box with the ID and copy button
+        with ui.row().classes('w-full items-center justify-between border-2 border-gray-200 p-2 rounded-lg bg-gray-50 no-wrap'):
+            ui.label(session_id).classes('font-mono text-xs text-gray-700 break-all ml-2')
+            
+            # Function to copy and notify
+            def copy_id():
+                ui.clipboard.write(session_id)
+                ui.notify('Session ID copied to clipboard!', color='positive', icon='check_circle')
+                
+            ui.button(icon='content_copy', on_click=copy_id).props('flat round color=primary').classes('ml-2')
+            
+        ui.button('Continue to App', on_click=session_dialog.close).classes('w-full mt-4').props('color=primary')
+
+    # Automatically open the dialog on load
+    ui.timer(0.1, session_dialog.open, once=True)
+   
+
+
     # --- 1. SESSION STATE ---
     class SessionState:
         def __init__(self):
@@ -508,15 +532,31 @@ async def main(request: Request):
             icon_style = "vertical-align: text-bottom; font-size: 1.2rem; margin-right: 4px; color: #555;"
             ui.markdown(f"""
             ### Mural Lighting Viewer
-            This tool allows you to rediscover the original perception of mural paintings through the simulation of historical light.
+            This tool allows you to rediscover the original perception of mural paintings through the simulation of historical light, both natural and artificial.
             
             #### How does it work?
-            1. **Window Selection:** Click Left or Right to activate a side.
-            2. **Lighting Menus:** Hover icons for Natural, Artificial, or Combinations.
-            3. **Global Filters:** Clock and Calendar.
-            4. **Tools:** Sync, Tone Mapping, Difference.
+             1. **Window Selection (Split Screen):**
+               - Click on the **Left** or **Right** half of the screen to activate it.
+               - Once selected, a **yellow border** will appear around that half.
+               - Select an image from the menu to load it on that side.
+               
+            2. **Lighting Menus:**
+               Hover over the top icons to view the options:
+               - <span class="material-symbols-outlined" style="{icon_style}">sunny</span> **Natural:** Different times and months of the year.
+               - <span class="material-symbols-outlined" style="{icon_style}">lightbulb_2</span> **Artificial:** Candles, oil lamps, and chandeliers.
+               - <span class="material-symbols-outlined" style="{icon_style}">sunny</span><span style="vertical-align: text-bottom;">+</span><span class="material-symbols-outlined" style="{icon_style}">lightbulb_2</span> **Combinations:** Mixture of natural and artificial light.
+               - <span style=" font-size: 0.9rem;">ALL</span> **All Combinations:** All options in a single large panel.
+            
+            3. **Global Filters:**
+               - <span class="material-symbols-outlined" style="{icon_style}">access_time</span> **Clock**: Filter by time.
+               - <span class="material-symbols-outlined" style="{icon_style}">calendar_today</span> **Calendar**: Filter by date.
+            
+            4. **Tools (Left):**
+               - <span class="material-symbols-outlined" style="{icon_style}">link</span> **Sync (Link):** Moves both cameras simultaneously if enabled.
+               - <span class="material-symbols-outlined" style="{icon_style}">tune</span> **Tone Mapping:** Opens a dropdown menu where you can adjust image processing settings.
+               - <span class="material-symbols-outlined" style="{icon_style}">difference</span> **Difference:** Visualizes the changes between the two images.
             """).classes('text-gray-700 leading-relaxed')
-    ui.timer(0.1, home_dialog.open, once=True)
+    #ui.timer(0.1, home_dialog.open, once=True)
 
     # --- 5. UI LAYOUT ---
     with ui.column().classes('absolute-full gap-0 no-wrap'):
@@ -816,82 +856,137 @@ async def main(request: Request):
 # --- STATS PAGE ---
 @ui.page('/stats')
 def stats_page():
-    interactions_by_ip_session = {}
+    # 1. Load all interactions grouped by session_id
+    interactions_by_session = {}
     if os.path.exists(INTERACTIONS_FILE):
         try:
             with open(INTERACTIONS_FILE, "r") as f: raw_events = json.load(f)
             from collections import defaultdict
-            temp_data = defaultdict(lambda: defaultdict(list))
-            for e in raw_events: temp_data[e.get('ip', 'Unknown')][e.get('session_id', 'Unknown')].append(e)
-            interactions_by_ip_session = temp_data
+            temp_data = defaultdict(list)
+            for e in raw_events: 
+                temp_data[e.get('session_id', 'Unknown')].append(e)
+            interactions_by_session = temp_data
         except: pass
 
     def reset_stats():
         if os.path.exists(LOG_FILE): os.remove(LOG_FILE)
         if os.path.exists(INTERACTIONS_FILE): os.remove(INTERACTIONS_FILE)
-        ui.notify('🧹 All data has been cleared.', color='positive'); ui.timer(1.0, lambda: ui.open('/stats'), once=True)
+        ui.notify('🧹 All data has been cleared.', color='positive')
+        ui.timer(1.0, lambda: ui.open('/stats'), once=True)
 
     with ui.row().classes('w-full justify-between items-center mb-6'):
-        ui.label('User Analytics').classes('text-2xl font-bold')
+        ui.label('User Analytics (By Session)').classes('text-2xl font-bold')
         ui.button('Reset Data', on_click=reset_stats, icon='delete_forever').props('color=red outline')
-    ui.label('Click on an IP to see specific devices/users connected to it.').classes('text-sm text-gray-500 mb-2')
+    
+    ui.label('Click on a Session ID to see every single interaction from that device.').classes('text-sm text-gray-500 mb-2')
 
     main_table = None 
-    from collections import defaultdict
-    session_visit_stats = defaultdict(lambda: {'count': 0, 'last_seen': '-'})
+    session_summary = {}
 
+    # 2. Load general visits to build the main table (No IP tracking)
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as f: visit_data = json.load(f)
-        ip_summary = {}
+        
         for visit in visit_data:
-            ip, ts, sid = visit.get('ip', 'Unknown'), visit.get('timestamp', '-'), visit.get('session_id', 'Unknown')
-            if ip not in ip_summary: ip_summary[ip] = {'count': 0, 'last_seen': ts, 'sessions': set()}
-            ip_summary[ip]['count'] += 1; ip_summary[ip]['last_seen'] = ts; ip_summary[ip]['sessions'].add(sid)
-            session_visit_stats[sid]['count'] += 1; session_visit_stats[sid]['last_seen'] = ts
+            sid = visit.get('session_id', 'Unknown')
+            ts = visit.get('timestamp', '-')
+            
+            if sid not in session_summary: 
+                session_summary[sid] = {'count': 0, 'last_seen': ts}
+            
+            session_summary[sid]['count'] += 1
+            session_summary[sid]['last_seen'] = ts
 
-        summary_rows = [{'ip': k, 'count': v['count'], 'last_seen': v['last_seen'], 'unique_users': len(v['sessions'])} for k, v in ip_summary.items()]
-        summary_rows.sort(key=lambda x: x['count'], reverse=True)
+        summary_rows = [
+            {'session_id': k, 'short_id': k[:8] + '...' if len(k)>8 else k, 'count': v['count'], 'last_seen': v['last_seen']} 
+            for k, v in session_summary.items()
+        ]
+        summary_rows.sort(key=lambda x: x['last_seen'], reverse=True) # Sort by most recent
+        
         main_table = ui.table(columns=[
-            {'name': 'ip', 'label': 'IP Address', 'field': 'ip', 'align': 'left', 'classes': 'font-bold text-blue-900'},
-            {'name': 'count', 'label': 'Visits', 'field': 'count', 'align': 'center', 'sortable': True},
-            {'name': 'unique_users', 'label': 'Unique Devices', 'field': 'unique_users', 'align': 'center', 'sortable': True},
+            {'name': 'short_id', 'label': 'Session ID', 'field': 'short_id', 'align': 'left', 'classes': 'font-bold text-blue-900'},
+            {'name': 'count', 'label': 'Total Visits', 'field': 'count', 'align': 'center', 'sortable': True},
             {'name': 'last_seen', 'label': 'Last Seen', 'field': 'last_seen', 'align': 'right', 'sortable': True}
-        ], rows=summary_rows, pagination=10).classes('w-full cursor-pointer hover:bg-gray-50 mb-8')
-    else: ui.label("No visit data found.").classes('text-gray-500 italic p-2')
+        ], rows=summary_rows, row_key='session_id', pagination=10).classes('w-full cursor-pointer hover:bg-gray-50 mb-8')
+    else: 
+        ui.label("No visit data found.").classes('text-gray-500 italic p-2')
 
     details_container = ui.column().classes('w-full transition-all')
 
-    def show_ip_details(e):
-        selected_ip = e.args[1]['ip'] if e.args[1] else None
+    # 3. Show grouped step-by-step details (No IP tracking)
+    def show_session_details(e):
         details_container.clear()
-        if not selected_ip: return
+        
+        # Safe extraction of the 'session_id' from the row click event arguments
+        row_data = None
+        for arg in e.args:
+            if isinstance(arg, dict) and 'session_id' in arg:
+                row_data = arg
+                break
+                
+        if not row_data:
+            ui.notify(f"Debug Info: {e.args}", color="negative", timeout=5000)
+            return
+            
+        selected_sid = row_data['session_id']
+        
         with details_container:
             ui.separator().classes('mb-4')
-            with ui.card().classes('w-full border-l-4 border-blue-500 shadow-lg bg-gray-50'):
-                with ui.row().classes('items-center justify-between w-full mb-4'):
-                    ui.label(f"Devices on Network: {selected_ip}").classes('text-xl font-bold text-gray-800')
+            with ui.card().classes('w-full border-l-4 border-blue-500 shadow-lg bg-gray-50 p-4'):
+                with ui.row().classes('items-center justify-between w-full mb-2'):
+                    ui.label(f"Interaction Log: {selected_sid}").classes('text-xl font-bold text-gray-800')
                     ui.button('Close', on_click=details_container.clear, icon='close').props('flat color=red dense')
 
-                sessions = interactions_by_ip_session.get(selected_ip, {})
-                sessions_found = []
-                if os.path.exists(LOG_FILE):
-                    with open(LOG_FILE, "r") as f:
-                        for v in json.load(f):
-                            if v.get('ip') == selected_ip and v.get('session_id') not in sessions_found: sessions_found.append(v.get('session_id'))
+                events = interactions_by_session.get(selected_sid, [])
+                stats = session_summary.get(selected_sid, {'count': 0, 'last_seen': 'N/A'})
+                
+                # The IP address was intentionally removed from this label for privacy
+                ui.label(f"Total Visits: {stats['count']} | Last Seen: {stats['last_seen']}").classes('text-sm text-gray-600 mb-4')
 
-                if not sessions_found: ui.label("No specific device sessions found.").classes('text-orange-600 italic p-4')
+                if not events: 
+                    ui.label("No specific clicks or interactions were recorded for this session yet.").classes('text-orange-600 italic')
                 else:
-                    for sid in sessions_found:
-                        stats, events = session_visit_stats.get(sid, {'count': 0, 'last_seen': 'N/A'}), sessions.get(sid, [])
-                        action_counts = defaultdict(lambda: defaultdict(int))
-                        for evt in events: action_counts[evt['action']][evt['detail']] += 1
-                        rows = [{"action": a, "detail": d, "count": c} for a, det in action_counts.items() for d, c in det.items()]
-                        with ui.expansion(f"Device ID: {sid[:8]}... | Visits: {stats['count']} | Last Seen: {stats['last_seen']}", icon="smartphone").classes('w-full bg-white mb-2 border rounded'):
-                            ui.label(f"Full ID: {sid}").classes('text-xs text-gray-400 mb-2 ml-2')
-                            if rows: ui.table(columns=[{'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left'}, {'name': 'detail', 'label': 'Detail', 'field': 'detail', 'align': 'left'}, {'name': 'count', 'label': 'Count', 'field': 'count', 'align': 'center'}], rows=rows, pagination=5).classes('w-full')
-                            else: ui.label("Visited, but no specific interactions recorded.").classes('text-sm italic text-gray-500 ml-4 mb-2')
-            ui.run_javascript('window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });')
+                    # Group identical events and count their occurrences
+                    aggregated_events = {}
+                    for evt in events:
+                        action = evt.get('action', 'Unknown')
+                        detail = evt.get('detail', '-')
+                        ts = evt.get('timestamp', '-')
+                        
+                        key = (action, detail)
+                        if key not in aggregated_events:
+                            aggregated_events[key] = {'count': 0, 'last_timestamp': ts}
+                        
+                        aggregated_events[key]['count'] += 1
+                        
+                        # Update to the most recent timestamp for this specific action
+                        if ts > aggregated_events[key]['last_timestamp']:
+                            aggregated_events[key]['last_timestamp'] = ts
+                    
+                    # Convert the aggregated dictionary back into a list format for the UI table
+                    rows = [
+                        {
+                            "action": act,
+                            "detail": det,
+                            "count": data['count'],
+                            "last_timestamp": data['last_timestamp']
+                        } for (act, det), data in aggregated_events.items()
+                    ]
+                    
+                    # Sort by the most recently performed action first
+                    rows.sort(key=lambda x: x['last_timestamp'], reverse=True)
+                    
+                    ui.table(columns=[
+                        {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left', 'sortable': True}, 
+                        {'name': 'detail', 'label': 'Detail (Selected item)', 'field': 'detail', 'align': 'left', 'sortable': True},
+                        {'name': 'count', 'label': 'Times Clicked', 'field': 'count', 'align': 'center', 'sortable': True},
+                        {'name': 'last_timestamp', 'label': 'Last Time', 'field': 'last_timestamp', 'align': 'right', 'sortable': True}
+                    ], rows=rows, pagination=15).classes('w-full bg-white')
+                    
+        # Scroll smoothly to the bottom to display the newly rendered interaction table
+        ui.run_javascript('window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });')
 
-    if main_table: main_table.on('rowClick', show_ip_details)
+    if main_table: 
+        main_table.on('rowClick', show_session_details)
 
 ui.run(title="Mural Lighting", storage_secret='secret_key_change_this_to_something_random')
